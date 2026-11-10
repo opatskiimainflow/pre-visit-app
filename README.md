@@ -4,6 +4,8 @@ AI pre-visit notes for small clinics. A patient answers a short questionnaire be
 appointment; the doctor gets a structured note (chief complaint, history, medications,
 allergies, red flags) on a daily dashboard.
 
+**Live demo:** https://previsit.opasnuu.workers.dev/login (one-click sign-in as patient, doctor or clinic admin; data resets nightly)
+
 > Portfolio demo. Not a medical device and does not provide diagnoses. All demo data is fictional.
 
 **Stack:** Next.js 16 (App Router, Server Actions) · TypeScript · Tailwind CSS 4 ·
@@ -37,6 +39,10 @@ each clinic sees only its own data and patients never see the AI note.
 5. **Run locally:** `npm run dev` → http://localhost:3000
 
 ## Deploy to Cloudflare Workers
+
+Every push to `main` is built and deployed by **Cloudflare Workers Builds**
+(build: `npx opennextjs-cloudflare build`, deploy: `npx opennextjs-cloudflare deploy`;
+`NEXT_PUBLIC_*` are set as build variables). Manual deploy from your machine:
 
 ```bash
 npx wrangler login                      # once

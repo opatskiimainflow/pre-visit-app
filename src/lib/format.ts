@@ -96,3 +96,29 @@ export function kyivToday(now: Date) {
 export function recentCutoff() {
   return new Date(Date.now() - 12 * 3600_000).toISOString();
 }
+
+export type PatientDetails = { date_of_birth: string | null; sex: string | null } | null | undefined;
+
+/** Full years between a "YYYY-MM-DD" birth date and today (clinic time). */
+export function ageFrom(dob: string, now: Date) {
+  const [y, m, d] = dob.split("-").map(Number);
+  const [ty, tm, td] = dayKey(now).split("-").map(Number);
+  return ty - y - (tm < m || (tm === m && td < d) ? 1 : 0);
+}
+
+/** "34 y · Female", "Male", "34 y" or null when nothing is known. */
+export function patientSummary(p: PatientDetails, now: Date) {
+  if (!p) return null;
+  const parts = [
+    p.date_of_birth ? `${ageFrom(p.date_of_birth, now)} y` : null,
+    p.sex === "female" ? "Female" : p.sex === "male" ? "Male" : null,
+  ].filter(Boolean);
+  return parts.length ? parts.join(" · ") : null;
+}
+
+/** "14 Mar 1990". */
+export function formatBirthDate(dob: string) {
+  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(
+    new Date(`${dob}T12:00:00Z`),
+  );
+}

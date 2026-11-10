@@ -3,6 +3,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { DEMO_MODEL, generateDemoNote } from "./demo-note";
+import { describePatient, type PatientContext } from "./patient";
+
+export type { PatientContext };
 
 /** Structured pre-visit note. Same shape the doctor page renders. */
 export const NoteSchema = z.object({
@@ -20,7 +23,6 @@ export const NoteSchema = z.object({
 
 export type Note = z.infer<typeof NoteSchema>;
 export type Answer = { question: string; answer: string };
-
 const INSTRUCTIONS = `You prepare a pre-visit note for a doctor from a patient's questionnaire.
 Rules:
 - Use only what the patient reported. Never invent symptoms, doses or history.
@@ -28,7 +30,9 @@ Rules:
 - Be concise and clinical. Write in English even if answers are in another language.
 - red_flags: list only reported symptoms that may need prompt attention (e.g. chest pain, fainting,
   shortness of breath, frequent painkiller use, drug–allergy conflicts). If none, return an empty list.
-- If an answer is missing or unclear, mention it in questions_for_doctor instead of guessing.`;
+- If an answer is missing or unclear, mention it in questions_for_doctor instead of guessing.
+- If the patient's age and sex are given, start history with them (e.g. "45-year-old man.") and take
+  them into account for red_flags, but do not guess anything from them that the patient did not report.`;
 
 export function aiConfigured() {
   return Boolean(process.env.ANTHROPIC_API_KEY);
@@ -36,12 +40,17 @@ export function aiConfigured() {
 
 /**
  * Turns questionnaire answers into a structured note.
- * Only the answers and the visit reason are sent to the model — no names or contact details.
+ * Only the answers, the visit reason and the patient's age/sex are sent to the model —
+ * no names, birth dates or contact details.
  */
-export async function generateNote(answers: Answer[], reason: string | null): Promise<{ note: Note; model: string }> {
+export async function generateNote(
+  answers: Answer[],
+  reason: string | null,
+  patient: PatientContext | null = null,
+): Promise<{ note: Note; model: string }> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   // No key → demo mode: a rule-based note, so the whole demo works for free.
-  if (!apiKey) return { note: generateDemoNote(answers, reason), model: DEMO_MODEL };
+  if (!apiKey) return { note: generateDemoNote(answers, reason, patient), model: DEMO_MODEL };
   const model = process.env.ANTHROPIC_MODEL || "claude-haiku-5-5";
 
   const client = new Anthropic({ apiKey });
@@ -52,7 +61,7 @@ export async function generateNote(answers: Answer[], reason: string | null): Pr
     max_tokens: 1500,
     system: INSTRUCTIONS,
     messages: [
-      { role: "user", content: `Reason for booking: ${reason ?? "not given"}\n\nQuestionnaire:\n${questionnaire}` },
+      { role: "user", content: `Patient: ${describePatient(patient) ?? "age and sex not given"}\nReason for booking: ${reason ?? "not given"}\n\nQuestionnaire:\n${questionnaire}` },
     ],
     output_config: { format: zodOutputFormat(NoteSchema) },
   });

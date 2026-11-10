@@ -1,4 +1,5 @@
 import type { Answer, Note } from "./note";
+import { describePatient, type PatientContext } from "./patient";
 
 /**
  * Demo mode: builds a pre-visit note with simple rules when no AI key is set.
@@ -38,7 +39,7 @@ const RED_FLAG_WORDS: [RegExp, string][] = [
   [/suicid|self[- ]harm/i, "Mentions self-harm — needs prompt attention"],
 ];
 
-export function generateDemoNote(answers: Answer[], reason: string | null): Note {
+export function generateDemoNote(answers: Answer[], reason: string | null, patient: PatientContext | null = null): Note {
   const complaint = find(answers, "main reason") || reason || "Not stated";
   const onset = find(answers, "when did it start");
   const chronic = find(answers, "chronic");
@@ -62,7 +63,13 @@ export function generateDemoNote(answers: Answer[], reason: string | null): Note
     redFlags.add("Takes amoxicillin despite reported penicillin allergy");
   }
 
+  const who = describePatient(patient);
+  if (patient?.age !== null && patient?.age !== undefined && patient.age >= 65 && urgentYes) {
+    redFlags.add("Age 65+ with reported chest pain, shortness of breath or fainting");
+  }
+
   const history = [
+    who && `${sentence(who)}`,
     onset && `Onset/course: ${sentence(onset)}`,
     chronic && !NONE.test(chronic) ? `Chronic conditions: ${sentence(chronic)}` : "No chronic conditions reported.",
     extra && !NONE.test(extra) ? sentence(extra) : "",

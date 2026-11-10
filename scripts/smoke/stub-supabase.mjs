@@ -7,12 +7,12 @@ const id = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 
 const CLINIC = id(100);
 const USERS = {
-  patient: { id: id(1), role: "patient", full_name: "Olena Kovalenko" },
+  patient: { id: id(1), role: "patient", full_name: "Olena Kovalenko", date_of_birth: "1990-03-14", sex: "female" },
   doctor: { id: id(2), role: "doctor", full_name: "Dr. Andriy Melnyk", specialty: "Family medicine" },
   admin: { id: id(3), role: "admin", full_name: "Iryna Bondar" },
 };
 const DOCTOR2 = { id: id(4), role: "doctor", full_name: "Dr. Oksana Petrenko", specialty: "Cardiology" };
-const PATIENT2 = { id: id(5), role: "patient", full_name: "Taras Hnatyuk" };
+const PATIENT2 = { id: id(5), role: "patient", full_name: "Taras Hnatyuk", date_of_birth: null, sex: null };
 const profile = (p) => ({ clinic_id: CLINIC, specialty: null, active: true, ...p });
 
 const inDays = (d, h) => {
@@ -39,7 +39,7 @@ const appointment = (n, extra = {}) => ({
   completed_at: n === 3 ? inDays(0, 12) : null,
   patient_id: PATIENT2.id,
   doctor_id: USERS.doctor.id,
-  patient: { full_name: PATIENT2.full_name },
+  patient: { full_name: PATIENT2.full_name, date_of_birth: "1982-07-02", sex: "male" },
   doctor: { full_name: USERS.doctor.full_name, specialty: USERS.doctor.specialty },
   intake: n === 0 ? null : { id: id(300 + n), submitted_at: inDays(0, 7), answers: [{ question: "Why?", answer: "Pain" }] },
   note: n >= 2 ? { id: id(400 + n), content: NOTE, model: n === 2 ? "demo-rules" : "claude-haiku-5-5", created_at: inDays(0, 7), edited_at: null } : null,

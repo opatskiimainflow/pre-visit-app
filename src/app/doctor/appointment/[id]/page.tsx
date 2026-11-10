@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { formatDateTime, formatDayLabel, formatTime, nowDate } from "@/lib/format";
+import { formatDateTime, formatDayLabel, formatTime, nowDate, patientSummary } from "@/lib/format";
 import { Card, PageShell } from "@/components/page-shell";
 import { SubmitButton } from "@/components/buttons";
 import { StatusChip } from "@/components/status-chip";
@@ -23,7 +23,7 @@ type Appt = {
   status: string;
   completed_at: string | null;
   patient_id: string;
-  patient: { full_name: string } | null;
+  patient: { full_name: string; date_of_birth: string | null; sex: string | null } | null;
   intake: { answers: Answer[]; submitted_at: string } | null;
   note: { content: Note; model: string | null; created_at: string; edited_at: string | null } | null;
   doctor_note: { body: string } | null;
@@ -46,7 +46,7 @@ export default async function AppointmentPage({ params }: PageProps<"/doctor/app
   const { data } = await supabase
     .from("appointments")
     .select(
-      "id, scheduled_at, reason, status, completed_at, patient_id, patient:profiles!appointments_patient_id_fkey(full_name), intake:intakes(answers, submitted_at), note:notes(content, model, created_at, edited_at), doctor_note:doctor_notes(body)",
+      "id, scheduled_at, reason, status, completed_at, patient_id, patient:profiles!appointments_patient_id_fkey(full_name, date_of_birth, sex), intake:intakes(answers, submitted_at), note:notes(content, model, created_at, edited_at), doctor_note:doctor_notes(body)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -78,7 +78,7 @@ export default async function AppointmentPage({ params }: PageProps<"/doctor/app
     <PageShell
       profile={profile}
       title={appt.patient?.full_name ?? "Patient"}
-      subtitle={`${formatDayLabel(appt.scheduled_at, nowDate())}, ${formatTime(appt.scheduled_at)}${appt.reason ? ` · ${appt.reason}` : ""}`}
+      subtitle={`${patientSummary(appt.patient, nowDate()) ? `${patientSummary(appt.patient, nowDate())} · ` : ""}${formatDayLabel(appt.scheduled_at, nowDate())}, ${formatTime(appt.scheduled_at)}${appt.reason ? ` · ${appt.reason}` : ""}`}
     >
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <Link href="/doctor" className="text-sm text-muted hover:text-brand">

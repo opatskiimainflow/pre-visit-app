@@ -43,6 +43,7 @@ begin
     (v_doctor,  v_clinic, 'doctor',  'Dr. Andriy Melnyk'),
     (v_admin,   v_clinic, 'admin',   'Iryna Bondar');
   update public.profiles set specialty = 'Family medicine' where id = v_doctor;
+  update public.profiles set date_of_birth = date '1990-03-14', sex = 'female' where id = v_patient;
 
   -- A second (fictional, no login) doctor so patients have a choice.
   insert into auth.users (id, instance_id, aud, role, email, created_at, updated_at,
@@ -88,6 +89,9 @@ begin
     (v_extra[1], v_clinic, 'patient', 'Taras Hnatyuk'),
     (v_extra[2], v_clinic, 'patient', 'Maria Shevchuk'),
     (v_extra[3], v_clinic, 'patient', 'Petro Lysenko');
+  update public.profiles set date_of_birth = date '1982-07-02', sex = 'male'   where id = v_extra[1];
+  update public.profiles set date_of_birth = date '1996-11-23', sex = 'female' where id = v_extra[2];
+  update public.profiles set date_of_birth = date '1959-01-30', sex = 'male'   where id = v_extra[3];
 
   -- 09:00 — answers in and note ready
   insert into public.appointments (clinic_id, patient_id, doctor_id, scheduled_at, reason)

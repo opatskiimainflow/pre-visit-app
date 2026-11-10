@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { formatDateTime, nowDate, recentCutoff } from "@/lib/format";
+import { formatBirthDate, formatDateTime, kyivToday, nowDate, patientSummary, recentCutoff } from "@/lib/format";
 import { Card, Empty, PageShell } from "@/components/page-shell";
 import { ConfirmSubmit } from "@/components/buttons";
 import { buttonClass } from "@/components/button-styles";
 import { cancelMyVisit } from "./book/actions";
+import { DetailsCard } from "./details-card";
 
 export const metadata: Metadata = { title: "My visits — PreVisit" };
 
@@ -27,6 +28,7 @@ export default async function PatientPage({ searchParams }: PageProps<"/patient"
   const supabase = await createClient();
 
   // RLS limits this to the signed-in patient's own appointments.
+  const { data: me } = await supabase.from("profiles").select("date_of_birth, sex").eq("id", profile.id).single();
   const { data } = await supabase
     .from("appointments")
     .select(
@@ -36,7 +38,8 @@ export default async function PatientPage({ searchParams }: PageProps<"/patient"
     .order("scheduled_at");
 
   const visits = (data ?? []) as unknown as Row[];
-  const now = nowDate().getTime();
+  const nowD = nowDate();
+  const now = nowD.getTime();
 
   return (
     <PageShell
@@ -48,6 +51,16 @@ export default async function PatientPage({ searchParams }: PageProps<"/patient"
         <Link href="/patient/book" className={buttonClass("brand")}>
           + Book a visit
         </Link>
+      </div>
+
+      <div className="mb-6">
+        <DetailsCard
+          dob={me?.date_of_birth ?? null}
+          sex={me?.sex ?? null}
+          summary={patientSummary(me, nowD)}
+          birthDate={me?.date_of_birth ? formatBirthDate(me.date_of_birth) : null}
+          today={kyivToday(nowD)}
+        />
       </div>
 
       {(sent || booked) && (

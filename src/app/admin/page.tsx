@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { formatDayLabel, formatTime, kyivToday, nowDate, recentCutoff } from "@/lib/format";
+import { formatDayLabel, formatTime, kyivToday, nowDate, patientSummary, recentCutoff } from "@/lib/format";
 import { Empty, PageShell } from "@/components/page-shell";
 import { ConfirmSubmit } from "@/components/buttons";
 import { StatusChip } from "@/components/status-chip";
@@ -16,7 +16,7 @@ type Row = {
   scheduled_at: string;
   reason: string | null;
   status: string;
-  patient: { full_name: string } | null;
+  patient: { full_name: string; date_of_birth: string | null; sex: string | null } | null;
   doctor: { full_name: string } | null;
   note: { id: string } | null;
   intake: { id: string } | null;
@@ -32,7 +32,7 @@ export default async function AdminPage() {
     supabase
       .from("appointments")
       .select(
-        "id, scheduled_at, reason, status, patient:profiles!appointments_patient_id_fkey(full_name), doctor:profiles!appointments_doctor_id_fkey(full_name), note:notes(id), intake:intakes(id)",
+        "id, scheduled_at, reason, status, patient:profiles!appointments_patient_id_fkey(full_name, date_of_birth, sex), doctor:profiles!appointments_doctor_id_fkey(full_name), note:notes(id), intake:intakes(id)",
       )
       .gte("scheduled_at", recentCutoff())
       .order("scheduled_at")
@@ -61,7 +61,12 @@ export default async function AdminPage() {
                     <span className="block text-xs text-muted">{formatDayLabel(a.scheduled_at, now)}</span>
                   </span>
                   <div>
-                    <p className="font-semibold text-ink">{a.patient?.full_name ?? "Patient"}</p>
+                    <p className="font-semibold text-ink">
+                      {a.patient?.full_name ?? "Patient"}
+                      {patientSummary(a.patient, now) && (
+                        <span className="ml-2 text-sm font-normal text-muted">{patientSummary(a.patient, now)}</span>
+                      )}
+                    </p>
                     <p className="text-sm text-muted">
                       {a.doctor?.full_name ?? "Doctor"}
                       {a.reason ? ` · ${a.reason}` : ""}

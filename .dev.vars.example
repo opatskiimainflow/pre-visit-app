@@ -1,0 +1,4 @@
+# Used by `npm run preview` (local Workers runtime).
+# Copy to .dev.vars and fill in. Same values as .env.local.
+NEXTJS_ENV=development
+DEMO_PASSWORD=change-me

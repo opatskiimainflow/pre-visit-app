@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+/* PreVisit brand — same palette as the Webflow landing page */
+@theme inline {
+  --color-brand: #0e9f9a;
+  --color-brand-dark: #0b7f7b;
+  --color-ink: #0b2a3c;
+  --color-muted: #4a5f6b;
+  --color-line: #e3ecee;
+  --color-soft: #f3f8f8;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background: #ffffff;
+  color: var(--color-ink);
+}

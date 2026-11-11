@@ -2,9 +2,11 @@ import Link from "next/link";
 
 const TABS = [
   { href: "/admin", label: "Appointments" },
+  { href: "/admin/analytics", label: "Analytics" },
   { href: "/admin/patients", label: "Patients" },
   { href: "/admin/doctors", label: "Doctors" },
   { href: "/admin/questions", label: "Questionnaire" },
+  { href: "/admin/activity", label: "Activity" },
 ] as const;
 
 export function AdminTabs({ active }: { active: (typeof TABS)[number]["href"] }) {

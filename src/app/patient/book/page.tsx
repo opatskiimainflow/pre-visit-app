@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { formatDateTime, formatDay, formatTime, isoWeekday, kyivNextDays, nowDate } from "@/lib/format";
+import { formatDateTime } from "@/lib/format";
+import { SlotPicker } from "@/components/slot-picker";
+import { loadFreeDays } from "@/lib/slots";
 import { Card, Empty, PageShell } from "@/components/page-shell";
 import { ConfirmForm } from "./confirm-form";
 
@@ -34,21 +36,9 @@ export default async function BookPage({ searchParams }: PageProps<"/patient/boo
 
   const doctor = doctors.find((d) => d.id === pick("doctor"));
   const doctorHours = doctor ? hours.filter((h) => h.doctor_id === doctor.id) : [];
-  const workDays = new Set(doctorHours.map((h) => h.weekday));
-  const days = doctor ? kyivNextDays(nowDate(), 14).filter((d) => workDays.has(isoWeekday(d))) : [];
-
-  // Free slots for every working day (a handful of small parallel calls), so we can
-  // open the first day that actually has free times and mark full days.
-  const slotsByDay = new Map<string, string[]>();
-  if (doctor) {
-    const results = await Promise.all(
-      days.map((d) => supabase.rpc("free_slots", { p_doctor: doctor.id, p_day: d })),
-    );
-    days.forEach((d, i) =>
-      slotsByDay.set(d, ((results[i].data ?? []) as string[]).map((s) => new Date(s).toISOString())),
-    );
-  }
-  const firstOpen = days.find((d) => (slotsByDay.get(d)?.length ?? 0) > 0) ?? days[0];
+  const { days, slotsByDay, firstOpen } = doctor
+    ? await loadFreeDays(supabase, doctor.id, new Set(doctorHours.map((h) => h.weekday)))
+    : { days: [] as string[], slotsByDay: new Map<string, string[]>(), firstOpen: undefined };
   const day = days.includes(pick("day") ?? "") ? pick("day")! : firstOpen;
   const slots = (day && slotsByDay.get(day)) || [];
   const slot = slots.includes(pick("slot") ?? "") ? pick("slot") : undefined;
@@ -91,71 +81,18 @@ export default async function BookPage({ searchParams }: PageProps<"/patient/boo
           )}
         </section>
 
-        {/* 2. Day */}
+        {/* 2–3. Day and time */}
         {doctor && (
-          <section>
-            <h2 className="mb-3 text-sm font-semibold tracking-wide text-brand-dark uppercase">2 · Day</h2>
-            {days.length === 0 ? (
-              <Empty>{doctor.full_name} has no working days in the next two weeks.</Empty>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {days.map((d) => {
-                  const free = slotsByDay.get(d)?.length ?? 0;
-                  if (free === 0 && d !== day) {
-                    return (
-                      <span
-                        key={d}
-                        className="rounded-full border border-dashed border-line px-4 py-2 text-sm text-muted/70"
-                        title="No free times"
-                      >
-                        {formatDay(d)} · full
-                      </span>
-                    );
-                  }
-                  return (
-                    <Link
-                      key={d}
-                      href={href({ doctor: doctor.id, day: d })}
-                      aria-current={d === day ? "date" : undefined}
-                      className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
-                        d === day ? "border-ink bg-ink text-white" : "border-line bg-white text-ink hover:border-brand"
-                      }`}
-                    >
-                      {formatDay(d)}
-                      <span className={d === day ? "ml-1.5 text-white/70" : "ml-1.5 text-muted"}>{free}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* 3. Time */}
-        {doctor && day && (
-          <section>
-            <h2 className="mb-3 text-sm font-semibold tracking-wide text-brand-dark uppercase">
-              3 · Time <span className="font-normal normal-case text-muted">({formatDay(day)}, clinic time)</span>
-            </h2>
-            {slots.length === 0 ? (
-              <Empty>No free times on this day. Try another day.</Empty>
-            ) : (
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 lg:grid-cols-8">
-                {slots.map((s) => (
-                  <Link
-                    key={s}
-                    href={href({ doctor: doctor.id, day, slot: s })}
-                    aria-current={s === slot ? "time" : undefined}
-                    className={`rounded-xl border px-3 py-2.5 text-center font-semibold transition ${
-                      s === slot ? "border-brand bg-brand text-white" : "border-line bg-white text-ink hover:border-brand"
-                    }`}
-                  >
-                    {formatTime(s)}
-                  </Link>
-                ))}
-              </div>
-            )}
-          </section>
+          <SlotPicker
+            days={days}
+            slotsByDay={slotsByDay}
+            day={day}
+            slot={slot}
+            hrefFor={(d, sl) => href({ doctor: doctor.id, day: d, slot: sl })}
+            doctorName={doctor.full_name}
+            dayStep="2 · Day"
+            timeStep="3 · Time"
+          />
         )}
 
         {/* 4. Confirm */}

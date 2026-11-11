@@ -5,6 +5,7 @@ import { formatDayLabel, formatTime, nowDate, patientSummary, recentCutoff } fro
 import Link from "next/link";
 import { Empty, PageShell } from "@/components/page-shell";
 import { StatusChip } from "@/components/status-chip";
+import { DoctorTabs } from "./doctor-tabs";
 
 export const metadata: Metadata = { title: "Today — PreVisit" };
 
@@ -37,6 +38,7 @@ export default async function DoctorPage() {
 
   return (
     <PageShell profile={profile} title="Upcoming appointments" subtitle={profile.full_name}>
+      <DoctorTabs active="/doctor" />
       {rows.length === 0 ? (
         <Empty>No appointments yet.</Empty>
       ) : (

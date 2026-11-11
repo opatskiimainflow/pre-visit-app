@@ -4,7 +4,7 @@
 -- visits dated "today" and "tomorrow", then runs it once.
 -- supabase/demo-cron.sql schedules it to run every night, so the live demo always looks fresh.
 --
--- Run AFTER schema.sql and all migrations (002–006).
+-- Run AFTER schema.sql and all migrations (002–007).
 --
 -- Before the first run: create three users in Supabase → Authentication → Users → Add user
 -- (tick "Auto Confirm User"), all with the same password = your DEMO_PASSWORD:
@@ -23,7 +23,20 @@ declare
   v_appt    uuid;
   v_doc2    uuid := gen_random_uuid();
   today     timestamptz := date_trunc('day', now() at time zone 'Europe/Kyiv') at time zone 'Europe/Kyiv';
+  v_today   date := (now() at time zone 'Europe/Kyiv')::date;
+  v_pool    uuid[];
+  v_reasons text[] := array['Check-up', 'Headaches', 'Back pain', 'Follow-up', 'Persistent cough',
+                            'Blood pressure', 'Chest discomfort', 'Fatigue', 'Skin rash', 'Lab results'];
+  v_d       date;
+  v_n       int;
+  v_idx     int;
+  v_at      timestamptz;
+  v_pat     uuid;
 begin
+  -- The reset writes a lot of rows; it adds its own believable history at the end
+  -- instead of logging every insert as "System" (see migrations/007).
+  perform set_config('previsit.skip_audit', 'on', true);
+
   if v_patient is null or v_doctor is null or v_admin is null then
     raise exception 'Create the three demo users in Authentication first (see the comment at the top).';
   end if;
@@ -145,6 +158,124 @@ begin
   -- 15:00 — waiting for the patient
   insert into public.appointments (clinic_id, patient_id, doctor_id, scheduled_at, reason)
   values (v_clinic, v_extra[3], v_doctor, today + interval '15 hours', 'Back pain');
+
+  -- ── More fictional patients and 8 weeks of history (for the analytics dashboard) ──
+  for i in 4..8 loop
+    v_extra := v_extra || gen_random_uuid();
+    insert into auth.users (id, instance_id, aud, role, email, created_at, updated_at,
+                            raw_app_meta_data, raw_user_meta_data)
+    values (v_extra[i], '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+            'fictional-' || i || '-' || substr(v_extra[i]::text, 1, 8) || '@demo.previsit.app',
+            now(), now(), '{"provider":"email","providers":["email"]}', '{}');
+  end loop;
+  insert into public.profiles (id, clinic_id, role, full_name, date_of_birth, sex) values
+    (v_extra[4], v_clinic, 'patient', 'Anna Moroz',          date '1988-05-19', 'female'),
+    (v_extra[5], v_clinic, 'patient', 'Dmytro Bondarenko',   date '1975-09-03', 'male'),
+    (v_extra[6], v_clinic, 'patient', 'Sofia Kravets',       date '2001-02-11', 'female'),
+    (v_extra[7], v_clinic, 'patient', 'Oleh Tkachenko',      date '1966-12-27', 'male'),
+    (v_extra[8], v_clinic, 'patient', 'Yulia Savchenko',     date '1993-08-08', 'female');
+  v_pool := v_extra;
+
+  -- Past visits: deterministic patterns, so the charts look the same after every reset.
+  for v_d in select generate_series(v_today - 56, v_today - 1, interval '1 day')::date loop
+    v_idx := v_d - v_today + 57;
+    if extract(isodow from v_d) between 1 and 5 then          -- Dr. Melnyk, Mon–Fri
+      v_n := 1 + (v_idx * 7 + v_idx / 7) % 3 + v_idx / 19;
+      for k in 0..v_n - 1 loop
+        v_at  := (v_d + time '09:00' + make_interval(mins => k * 90)) at time zone 'Europe/Kyiv';
+        v_pat := v_pool[1 + (v_idx * 5 + k) % array_length(v_pool, 1)];
+        insert into public.appointments (clinic_id, patient_id, doctor_id, scheduled_at, reason, status, completed_at)
+        values (v_clinic, v_pat, v_doctor, v_at, v_reasons[1 + (v_idx + k * 3) % 10],
+                'completed', v_at + interval '30 minutes')
+        returning id into v_appt;
+        if (v_idx + k) % 6 <> 0 then
+          insert into public.intakes (appointment_id, answers, submitted_at) values (v_appt,
+            jsonb_build_array(jsonb_build_object('question', 'What is the main reason for your visit?',
+                                                 'answer', v_reasons[1 + (v_idx + k * 3) % 10])),
+            v_at - interval '20 hours');
+        end if;
+      end loop;
+    end if;
+    if extract(isodow from v_d) in (2, 4) then                -- Dr. Petrenko, Tue/Thu
+      v_n := 1 + (v_idx * 3) % 3;
+      for k in 0..v_n - 1 loop
+        v_at  := (v_d + time '10:00' + make_interval(mins => k * 60)) at time zone 'Europe/Kyiv';
+        v_pat := v_pool[1 + (v_idx * 3 + k + 2) % array_length(v_pool, 1)];
+        insert into public.appointments (clinic_id, patient_id, doctor_id, scheduled_at, reason, status, completed_at)
+        values (v_clinic, v_pat, v_doc2, v_at, v_reasons[1 + (v_idx * 2 + k) % 10],
+                'completed', v_at + interval '30 minutes')
+        returning id into v_appt;
+        if (v_idx + k) % 4 <> 0 then
+          insert into public.intakes (appointment_id, answers, submitted_at) values (v_appt,
+            jsonb_build_array(jsonb_build_object('question', 'What is the main reason for your visit?',
+                                                 'answer', v_reasons[1 + (v_idx * 2 + k) % 10])),
+            v_at - interval '1 day');
+        end if;
+      end loop;
+    end if;
+  end loop;
+
+  -- Upcoming week: some booked slots, so the calendar and the load chart are not empty.
+  for v_d in select generate_series(v_today + 1, v_today + 7, interval '1 day')::date loop
+    v_idx := v_d - v_today;
+    if extract(isodow from v_d) between 1 and 5 then
+      for k in 0..(v_idx % 3) loop
+        v_at := (v_d + time '11:30' + make_interval(mins => k * 90)) at time zone 'Europe/Kyiv';
+        insert into public.appointments (clinic_id, patient_id, doctor_id, scheduled_at, reason)
+        values (v_clinic, v_pool[1 + (v_idx * 2 + k) % array_length(v_pool, 1)], v_doctor, v_at,
+                v_reasons[1 + (v_idx + k) % 10])
+        returning id into v_appt;
+        if (v_idx + k) % 2 = 0 then
+          insert into public.intakes (appointment_id, answers) values (v_appt,
+            jsonb_build_array(jsonb_build_object('question', 'What is the main reason for your visit?',
+                                                 'answer', v_reasons[1 + (v_idx + k) % 10])));
+        end if;
+      end loop;
+    end if;
+    if extract(isodow from v_d) in (2, 4, 6) then
+      insert into public.appointments (clinic_id, patient_id, doctor_id, scheduled_at, reason)
+      values (v_clinic, v_pool[1 + (v_idx + 4) % array_length(v_pool, 1)], v_doc2,
+              (v_d + time '10:30') at time zone 'Europe/Kyiv', v_reasons[1 + (v_idx * 3) % 10]);
+    end if;
+  end loop;
+
+  -- A believable activity log for everything above (who booked, filled in, completed).
+  insert into public.appointment_events (clinic_id, appointment_id, patient_id, doctor_id,
+      actor_id, actor_name, actor_role, action, patient_name, doctor_name, scheduled_at, details, created_at)
+  select a.clinic_id, a.id, a.patient_id, a.doctor_id,
+         case when x.by_admin then v_admin else a.patient_id end,
+         case when x.by_admin then 'Iryna Bondar' else p.full_name end,
+         case when x.by_admin then 'admin' else 'patient' end,
+         'booked', p.full_name, d.full_name, a.scheduled_at,
+         jsonb_build_object('reason', a.reason),
+         least(now() - interval '5 minutes', a.scheduled_at - make_interval(days => 2 + x.h % 5, hours => x.h % 9))
+  from public.appointments a
+  join public.profiles p on p.id = a.patient_id
+  join public.profiles d on d.id = a.doctor_id
+  cross join lateral (select abs(hashtext(a.id::text)) as h, abs(hashtext(a.id::text)) % 3 = 0 as by_admin) x
+  where a.clinic_id = v_clinic;
+
+  insert into public.appointment_events (clinic_id, appointment_id, patient_id, doctor_id,
+      actor_id, actor_name, actor_role, action, patient_name, doctor_name, scheduled_at, created_at)
+  select a.clinic_id, a.id, a.patient_id, a.doctor_id, a.patient_id, p.full_name, 'patient',
+         'intake_submitted', p.full_name, d.full_name, a.scheduled_at,
+         least(now() - interval '2 minutes', i.submitted_at)
+  from public.intakes i
+  join public.appointments a on a.id = i.appointment_id
+  join public.profiles p on p.id = a.patient_id
+  join public.profiles d on d.id = a.doctor_id
+  where a.clinic_id = v_clinic;
+
+  insert into public.appointment_events (clinic_id, appointment_id, patient_id, doctor_id,
+      actor_id, actor_name, actor_role, action, patient_name, doctor_name, scheduled_at, created_at)
+  select a.clinic_id, a.id, a.patient_id, a.doctor_id, a.doctor_id, d.full_name, 'doctor',
+         'completed', p.full_name, d.full_name, a.scheduled_at, a.completed_at
+  from public.appointments a
+  join public.profiles p on p.id = a.patient_id
+  join public.profiles d on d.id = a.doctor_id
+  where a.clinic_id = v_clinic and a.status = 'completed';
+
+  perform set_config('previsit.skip_audit', 'off', true);
 end $$;
 
 -- Only the database itself (cron / SQL editor) may run this. It is never callable from the app.

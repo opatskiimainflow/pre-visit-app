@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatDateTime, formatDayLabel, formatTime, nowDate, patientSummary } from "@/lib/format";
 import { Card, PageShell } from "@/components/page-shell";
+import { ACTIONS, EVENT_SELECT, describeEvent, type VisitEvent } from "@/lib/events";
 import { SubmitButton } from "@/components/buttons";
 import { StatusChip } from "@/components/status-chip";
 import type { Answer, Note } from "@/lib/ai/note";
@@ -55,13 +56,23 @@ export default async function AppointmentPage({ params }: PageProps<"/doctor/app
   if (!appt) notFound();
 
   // Earlier visits of this patient with this doctor (RLS: a doctor sees only their own visits).
-  const { data: historyRows } = await supabase
-    .from("appointments")
-    .select("id, scheduled_at, reason, status, note:notes(content)")
-    .eq("patient_id", appt.patient_id)
-    .lt("scheduled_at", appt.scheduled_at)
-    .order("scheduled_at", { ascending: false })
-    .limit(5);
+  const [{ data: historyRows }, { data: eventRows }] = await Promise.all([
+    supabase
+      .from("appointments")
+      .select("id, scheduled_at, reason, status, note:notes(content)")
+      .eq("patient_id", appt.patient_id)
+      .lt("scheduled_at", appt.scheduled_at)
+      .order("scheduled_at", { ascending: false })
+      .limit(5),
+    // Change history of this visit (audit log, written by database triggers).
+    supabase
+      .from("appointment_events")
+      .select(EVENT_SELECT)
+      .eq("appointment_id", appt.id)
+      .order("created_at")
+      .order("id"),
+  ]);
+  const events = ((eventRows ?? []) as VisitEvent[]).filter((e) => new Date(e.created_at) <= nowDate());
   const history = (historyRows ?? []) as unknown as History[];
   const completed = appt.status === "completed";
 
@@ -158,6 +169,27 @@ export default async function AppointmentPage({ params }: PageProps<"/doctor/app
               </ol>
             ) : (
               <p className="mt-2 text-sm text-muted">No answers yet.</p>
+            )}
+          </Card>
+          <Card>
+            <h2 className="font-bold text-ink">Visit history</h2>
+            {events.length === 0 ? (
+              <p className="mt-2 text-sm text-muted">No changes recorded.</p>
+            ) : (
+              <ol className="mt-4 grid gap-3 border-l border-line pl-4">
+                {events.map((e) => (
+                  <li key={e.id} className="relative">
+                    <span
+                      className={`absolute top-1.5 -left-[21px] size-2.5 rounded-full ring-2 ring-white ${ACTIONS[e.action]?.dot ?? "bg-muted"}`}
+                      aria-hidden
+                    />
+                    <p className="text-sm text-ink">
+                      <span className="font-semibold">{e.actor_name}</span> {describeEvent(e, false)}
+                    </p>
+                    <p className="text-xs text-muted">{formatDateTime(e.created_at)}</p>
+                  </li>
+                ))}
+              </ol>
             )}
           </Card>
         </aside>

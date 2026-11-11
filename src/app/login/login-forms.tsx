@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { signIn, signInDemo, type LoginState } from "./actions";
 
@@ -62,6 +63,9 @@ export function EmailLogin() {
         {pending ? "Signing in…" : "Sign in"}
       </button>
       {state.error && <p className="text-sm text-red-600">{state.error}</p>}
+      <Link href="/forgot-password" className="justify-self-center text-sm text-muted hover:text-brand">
+        Forgot password?
+      </Link>
     </form>
   );
 }

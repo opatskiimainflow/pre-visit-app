@@ -16,9 +16,13 @@ LLM for note generation · Webflow for the marketing site.
 
 | Role         | Sees                                                        |
 | ------------ | ----------------------------------------------------------- |
-| Patient      | Signs up (or uses the demo account), books from doctors' free slots, cancels, fills the questionnaire, keeps date of birth/sex up to date |
-| Doctor       | Own schedule, answers, AI note (edit), private notes, completes visits |
-| Clinic admin | Books and cancels visits, sees the patient list, manages doctors and hours, edits the questionnaire |
+| Patient      | Signs up (or uses the demo account), resets a forgotten password, books from doctors' free slots, reschedules or cancels, fills the questionnaire, keeps date of birth/sex up to date |
+| Doctor       | Upcoming list and week calendar, answers, AI note (edit), private notes, visit history, completes visits |
+| Clinic admin | Analytics dashboard, books and cancels visits, patient list, activity log, manages doctors and hours, edits the questionnaire |
+
+Every change to a visit (booked, moved, cancelled, answers sent, note created/edited, completed)
+is recorded by database triggers in `appointment_events`, so the history can't be skipped or edited
+from the app.
 
 Access is enforced in the database with RLS (`supabase/schema.sql`), not only in the UI:
 each clinic sees only its own data and patients never see the AI note.
@@ -32,8 +36,11 @@ each clinic sees only its own data and patients never see the AI note.
    and `supabase/migrations/004_doctor_management.sql` (admins add doctors and edit their hours)
    and `supabase/migrations/005_patient_details.sql` (patient date of birth and sex)
    and `supabase/migrations/006_self_signup.sql` (visitors sign up as patients of the demo clinic).
+   and `supabase/migrations/007_audit_reschedule.sql` (audit log written by triggers, patient rescheduling).
    In *Authentication → Sign In / Providers* keep **Allow new users to sign up** on and turn
    **Confirm email** off (the free Supabase mailer only reaches project members).
+   In *Authentication → URL Configuration* set **Site URL** to your app URL and add
+   `https://<your-app>/auth/callback` to **Redirect URLs** (used by the password reset email).
 3. **Demo users:** in *Authentication → Users → Add user* create (with *Auto Confirm*, same password):
    `patient@demo.previsit.app`, `doctor@demo.previsit.app`, `admin@demo.previsit.app`.
    Then run `supabase/seed.sql`: it creates `public.reset_demo()` and fills the demo clinic.

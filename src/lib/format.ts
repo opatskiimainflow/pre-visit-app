@@ -122,3 +122,44 @@ export function formatBirthDate(dob: string) {
     new Date(`${dob}T12:00:00Z`),
   );
 }
+
+/** "YYYY-MM-DD" shifted by n calendar days. */
+export function addDays(day: string, n: number) {
+  const [y, m, d] = day.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+}
+
+/** Monday of the week that contains `day` ("YYYY-MM-DD"). */
+export function weekStart(day: string) {
+  return addDays(day, 1 - isoWeekday(day));
+}
+
+/** Start of a clinic-time day as an ISO instant (for range queries). */
+export function kyivDayStartISO(day: string) {
+  return kyivLocalToISO(day, "00:00")!;
+}
+
+/** Clinic-time calendar day of an instant, "YYYY-MM-DD". */
+export function kyivDayOf(iso: string) {
+  return dayKey(new Date(iso));
+}
+
+/** "9 – 15 Nov 2026" / "30 Nov – 6 Dec 2026". */
+export function formatWeekRange(monday: string) {
+  const sunday = addDays(monday, 6);
+  const f = (day: string, opts: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat("en-GB", { ...opts, timeZone: "UTC" }).format(new Date(`${day}T12:00:00Z`));
+  const sameMonth = monday.slice(0, 7) === sunday.slice(0, 7);
+  return `${f(monday, sameMonth ? { day: "numeric" } : { day: "numeric", month: "short" })} – ${f(sunday, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })}`;
+}
+
+/** "12 Nov" for chart axes. */
+export function formatShortDate(day: string) {
+  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(
+    new Date(`${day}T12:00:00Z`),
+  );
+}

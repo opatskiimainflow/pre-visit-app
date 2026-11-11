@@ -25,6 +25,7 @@ export default async function PatientPage({ searchParams }: PageProps<"/patient"
   const sent = sp.sent === "1";
   const booked = sp.booked === "1";
   const welcome = sp.welcome === "1";
+  const moved = sp.moved === "1";
   const profile = await requireRole("patient");
   const supabase = await createClient();
 
@@ -74,6 +75,13 @@ export default async function PatientPage({ searchParams }: PageProps<"/patient"
         </div>
       )}
 
+      {moved && (
+        <div className="mb-6 rounded-2xl border border-brand/30 bg-white p-5 text-ink">
+          <p className="font-semibold">Your visit was moved.</p>
+          <p className="text-sm text-muted">Your answers stay with the visit, so there is nothing to fill in again.</p>
+        </div>
+      )}
+
       {(sent || booked) && (
         <div className="mb-6 rounded-2xl border border-brand/30 bg-white p-5 text-ink">
           {booked ? (
@@ -120,6 +128,11 @@ export default async function PatientPage({ searchParams }: PageProps<"/patient"
                         className="rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand"
                       >
                         Fill in questionnaire →
+                      </Link>
+                    )}
+                    {canCancel && (
+                      <Link href={`/patient/reschedule/${v.id}`} className={buttonClass("ghost", "sm")}>
+                        Reschedule
                       </Link>
                     )}
                     {canCancel && (

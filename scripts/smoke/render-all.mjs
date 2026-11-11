@@ -21,10 +21,10 @@ const A3 = "00000000-0000-4000-8000-000000000203";
 const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
 
 const PAGES = {
-  anon: ["/login", "/signup", "/"],
-  patient: ["/patient", "/patient?booked=1", "/patient?welcome=1", "/patient/book", `/patient/book?doctor=${D1}`, `/patient/book?doctor=${D1}&day=${tomorrow}`, `/patient/visit/00000000-0000-4000-8000-000000000200`],
-  doctor: ["/doctor", `/doctor/appointment/${A1}`, `/doctor/appointment/${A3}`, "/doctor/appointment/00000000-0000-4000-8000-000000000202"],
-  admin: ["/admin", "/admin/patients", "/admin/doctors", "/admin/questions"],
+  anon: ["/login", "/signup", "/forgot-password", "/forgot-password?expired=1", "/reset-password", "/"],
+  patient: ["/patient", "/patient?booked=1", "/patient?welcome=1", "/patient?moved=1", `/patient/reschedule/${A1}`, "/patient/book", `/patient/book?doctor=${D1}`, `/patient/book?doctor=${D1}&day=${tomorrow}`, `/patient/visit/00000000-0000-4000-8000-000000000200`],
+  doctor: ["/doctor", "/doctor/calendar", "/doctor/calendar?week=2026-11-02", `/doctor/appointment/${A1}`, `/doctor/appointment/${A3}`, "/doctor/appointment/00000000-0000-4000-8000-000000000202"],
+  admin: ["/admin", "/admin/analytics", "/admin/activity", "/admin/activity?type=note", "/admin/patients", "/admin/doctors", "/admin/questions"],
 };
 
 let failed = 0;

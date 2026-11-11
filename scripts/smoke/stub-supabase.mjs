@@ -40,7 +40,7 @@ const appointment = (n, extra = {}) => ({
   patient_id: PATIENT2.id,
   doctor_id: USERS.doctor.id,
   patient: { full_name: PATIENT2.full_name, date_of_birth: "1982-07-02", sex: "male" },
-  doctor: { full_name: USERS.doctor.full_name, specialty: USERS.doctor.specialty },
+  doctor: { id: USERS.doctor.id, full_name: USERS.doctor.full_name, specialty: USERS.doctor.specialty },
   intake: n === 0 ? null : { id: id(300 + n), submitted_at: inDays(0, 7), answers: [{ question: "Why?", answer: "Pain" }] },
   note: n >= 2 ? { id: id(400 + n), content: NOTE, model: n === 2 ? "demo-rules" : "claude-haiku-5-5", created_at: inDays(0, 7), edited_at: null } : null,
   doctor_note: n === 3 ? { body: "BP 150/95" } : null,
@@ -62,7 +62,25 @@ function rows(table) {
     case "appointments":
       return [0, 1, 2, 3].map((n) => appointment(n));
     case "doctor_hours":
-      return [1, 2, 3, 4, 5].map((w) => ({ doctor_id: USERS.doctor.id, weekday: w, start_time: "09:00:00", end_time: "17:00:00", slot_minutes: 30 }));
+      return [
+        ...[1, 2, 3, 4, 5].map((w) => ({ doctor_id: USERS.doctor.id, weekday: w, start_time: "09:00:00", end_time: "17:00:00", slot_minutes: 30 })),
+        ...[2, 4].map((w) => ({ doctor_id: DOCTOR2.id, weekday: w, start_time: "10:00:00", end_time: "16:00:00", slot_minutes: 30 })),
+      ];
+    case "appointment_events":
+      return ["booked", "intake_submitted", "note_created", "rescheduled", "completed", "cancelled"].map((action, i) => ({
+        id: i + 1,
+        appointment_id: id(201),
+        patient_id: PATIENT2.id,
+        doctor_id: USERS.doctor.id,
+        actor_name: i % 2 ? "Taras Hnatyuk" : "Iryna Bondar",
+        actor_role: i % 2 ? "patient" : "admin",
+        action,
+        patient_name: PATIENT2.full_name,
+        doctor_name: USERS.doctor.full_name,
+        scheduled_at: inDays(1, 9),
+        details: action === "rescheduled" ? { from: inDays(1, 8), to: inDays(1, 9) } : { reason: "Headaches" },
+        created_at: inDays(-i, 10),
+      }));
     default:
       return [];
   }
@@ -90,6 +108,31 @@ const server = http.createServer((req, res) => {
   if (req.method !== "GET") return send(201, []);
 
   let data = rows(table);
+  // Richer, deterministic history for the analytics dashboard and the week calendar.
+  const sel = url.searchParams.get("select") ?? "";
+  if (table === "appointments" && (sel.replace(/\s/g, "").includes("doctor_id,intake") || sel.replace(/\s/g, "").includes("note:notes(id),intake"))) {
+    data = [];
+    for (let d = -60; d <= 8; d++) {
+      const n = d < 0 ? 1 + ((d * 7 + 100) % 3) + Math.floor((d + 60) / 20) : 1 + ((d + 9) % 3);
+      for (let k = 0; k < n; k++) {
+        const t = new Date();
+        t.setUTCDate(t.getUTCDate() + d);
+        t.setUTCHours(7 + k * 2, 0, 0, 0);
+        if ([0, 6].includes(t.getUTCDay())) continue;
+        const past = t < new Date();
+        data.push({
+          id: `00000000-0000-4000-9000-${String((d + 100) * 10 + k).padStart(12, "0")}`,
+          scheduled_at: t.toISOString(),
+          status: past ? "completed" : "scheduled",
+          doctor_id: k % 3 === 2 ? DOCTOR2.id : USERS.doctor.id,
+          reason: "Check-up",
+          patient: { full_name: ["Taras Hnatyuk", "Maria Shevchuk", "Petro Lysenko", "Anna Moroz"][(d + k + 60) % 4] },
+          note: (d + k) % 3 === 0 ? { id: "n" } : null,
+          intake: (d + k) % 5 !== 0 ? { id: "i" } : null,
+        });
+      }
+    }
+  }
   // Honour simple eq filters (?id=eq.x, ?role=eq.doctor) so .single() gets the right row.
   for (const [k, v] of url.searchParams) {
     if (typeof v === "string" && v.startsWith("eq.") && !["select", "order", "limit"].includes(k)) {

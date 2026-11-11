@@ -16,7 +16,7 @@ LLM for note generation · Webflow for the marketing site.
 
 | Role         | Sees                                                        |
 | ------------ | ----------------------------------------------------------- |
-| Patient      | Books from doctors' free slots, cancels, fills the questionnaire, keeps date of birth/sex up to date |
+| Patient      | Signs up (or uses the demo account), books from doctors' free slots, cancels, fills the questionnaire, keeps date of birth/sex up to date |
 | Doctor       | Own schedule, answers, AI note (edit), private notes, completes visits |
 | Clinic admin | Books and cancels visits, sees the patient list, manages doctors and hours, edits the questionnaire |
 
@@ -30,7 +30,10 @@ each clinic sees only its own data and patients never see the AI note.
    then `supabase/migrations/002_visits_and_editing.sql` (booking, visit status, note editing)
    and `supabase/migrations/003_self_booking.sql` (doctors' hours, free slots, patient self-booking)
    and `supabase/migrations/004_doctor_management.sql` (admins add doctors and edit their hours)
-   and `supabase/migrations/005_patient_details.sql` (patient date of birth and sex).
+   and `supabase/migrations/005_patient_details.sql` (patient date of birth and sex)
+   and `supabase/migrations/006_self_signup.sql` (visitors sign up as patients of the demo clinic).
+   In *Authentication → Sign In / Providers* keep **Allow new users to sign up** on and turn
+   **Confirm email** off (the free Supabase mailer only reaches project members).
 3. **Demo users:** in *Authentication → Users → Add user* create (with *Auto Confirm*, same password):
    `patient@demo.previsit.app`, `doctor@demo.previsit.app`, `admin@demo.previsit.app`.
    Then run `supabase/seed.sql`: it creates `public.reset_demo()` and fills the demo clinic.

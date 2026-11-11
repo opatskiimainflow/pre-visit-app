@@ -4,7 +4,7 @@
 -- visits dated "today" and "tomorrow", then runs it once.
 -- supabase/demo-cron.sql schedules it to run every night, so the live demo always looks fresh.
 --
--- Run AFTER schema.sql and migrations/002, 003 and 004.
+-- Run AFTER schema.sql and all migrations (002–006).
 --
 -- Before the first run: create three users in Supabase → Authentication → Users → Add user
 -- (tick "Auto Confirm User"), all with the same password = your DEMO_PASSWORD:
@@ -31,6 +31,8 @@ begin
   -- Reset previous demo data.
   delete from public.clinics where name = 'Sunrise Family Clinic';
   delete from auth.users where email like 'fictional-%@demo.previsit.app';
+  -- Visitors who signed up through the app (see migrations/006): their accounts last one day.
+  delete from auth.users where raw_user_meta_data ->> 'self_signup' = 'true';
   -- Doctors added by visitors through the admin page (no login) whose clinic is gone.
   delete from auth.users u
   where u.email like 'staff-%@no-login.previsit.app'

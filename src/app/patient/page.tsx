@@ -24,6 +24,7 @@ export default async function PatientPage({ searchParams }: PageProps<"/patient"
   const sp = await searchParams;
   const sent = sp.sent === "1";
   const booked = sp.booked === "1";
+  const welcome = sp.welcome === "1";
   const profile = await requireRole("patient");
   const supabase = await createClient();
 
@@ -62,6 +63,16 @@ export default async function PatientPage({ searchParams }: PageProps<"/patient"
           today={kyivToday(nowD)}
         />
       </div>
+
+      {welcome && (
+        <div className="mb-6 rounded-2xl border border-brand/30 bg-white p-5 text-ink">
+          <p className="font-semibold">Welcome to PreVisit, {profile.full_name.split(" ")[0]}!</p>
+          <p className="text-sm text-muted">
+            Your demo account is ready. Add your details below, then book a visit. Demo accounts are deleted every
+            night.
+          </p>
+        </div>
+      )}
 
       {(sent || booked) && (
         <div className="mb-6 rounded-2xl border border-brand/30 bg-white p-5 text-ink">

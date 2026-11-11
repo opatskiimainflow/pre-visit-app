@@ -4,9 +4,9 @@ import { useActionState } from "react";
 import { signIn, signInDemo, type LoginState } from "./actions";
 
 const DEMO_ROLES = [
-  { role: "patient", title: "Patient", text: "Fill in the pre-visit questionnaire" },
+  { role: "patient", title: "Patient", text: "Book a visit and fill in the questionnaire" },
   { role: "doctor", title: "Doctor", text: "See today's appointments and AI notes" },
-  { role: "admin", title: "Clinic admin", text: "Manage the clinic's questions" },
+  { role: "admin", title: "Clinic admin", text: "Visits, patients, doctors and the questionnaire" },
 ] as const;
 
 export function DemoLogin() {

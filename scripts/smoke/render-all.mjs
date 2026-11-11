@@ -21,8 +21,8 @@ const A3 = "00000000-0000-4000-8000-000000000203";
 const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
 
 const PAGES = {
-  anon: ["/login", "/"],
-  patient: ["/patient", "/patient?booked=1", "/patient/book", `/patient/book?doctor=${D1}`, `/patient/book?doctor=${D1}&day=${tomorrow}`, `/patient/visit/00000000-0000-4000-8000-000000000200`],
+  anon: ["/login", "/signup", "/"],
+  patient: ["/patient", "/patient?booked=1", "/patient?welcome=1", "/patient/book", `/patient/book?doctor=${D1}`, `/patient/book?doctor=${D1}&day=${tomorrow}`, `/patient/visit/00000000-0000-4000-8000-000000000200`],
   doctor: ["/doctor", `/doctor/appointment/${A1}`, `/doctor/appointment/${A3}`, "/doctor/appointment/00000000-0000-4000-8000-000000000202"],
   admin: ["/admin", "/admin/patients", "/admin/doctors", "/admin/questions"],
 };

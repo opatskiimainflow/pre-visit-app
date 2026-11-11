@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Logo } from "@/components/app-header";
 import { DemoLogin, EmailLogin } from "./login-forms";
 
@@ -23,6 +24,12 @@ export default function LoginPage() {
             <span className="h-px flex-1 bg-line" />
           </div>
           <EmailLogin />
+          <p className="mt-6 text-center text-sm text-muted">
+            New here?{" "}
+            <Link href="/signup" className="font-semibold text-brand-dark hover:text-brand">
+              Create a patient account
+            </Link>
+          </p>
         </div>
         <p className="mt-6 text-center text-xs text-muted">
           Portfolio demo. Not a medical device and does not provide diagnoses.

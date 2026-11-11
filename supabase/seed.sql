@@ -248,7 +248,9 @@ begin
          case when x.by_admin then 'admin' else 'patient' end,
          'booked', p.full_name, d.full_name, a.scheduled_at,
          jsonb_build_object('reason', a.reason),
-         least(now() - interval '5 minutes', a.scheduled_at - make_interval(days => 2 + x.h % 5, hours => x.h % 9))
+         -- At least a day before "now" and 2+ days before the visit, so it always comes
+         -- before the questionnaire answers below.
+         least(now() - make_interval(hours => 26 + x.h % 48), a.scheduled_at - make_interval(days => 2 + x.h % 5, hours => x.h % 9))
   from public.appointments a
   join public.profiles p on p.id = a.patient_id
   join public.profiles d on d.id = a.doctor_id
@@ -259,7 +261,9 @@ begin
       actor_id, actor_name, actor_role, action, patient_name, doctor_name, scheduled_at, created_at)
   select a.clinic_id, a.id, a.patient_id, a.doctor_id, a.patient_id, p.full_name, 'patient',
          'intake_submitted', p.full_name, d.full_name, a.scheduled_at,
-         least(now() - interval '2 minutes', i.submitted_at)
+         -- Answers arrive before the visit (not "just now" for today's and upcoming ones).
+         least(now() - make_interval(mins => 2 + abs(hashtext(a.id::text)) % 1400),
+               i.submitted_at, a.scheduled_at - interval '18 hours')
   from public.intakes i
   join public.appointments a on a.id = i.appointment_id
   join public.profiles p on p.id = a.patient_id

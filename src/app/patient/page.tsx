@@ -78,7 +78,7 @@ export default async function PatientPage({ searchParams }: PageProps<"/patient"
       {moved && (
         <div className="mb-6 rounded-2xl border border-brand/30 bg-white p-5 text-ink">
           <p className="font-semibold">Your visit was moved.</p>
-          <p className="text-sm text-muted">Your answers stay with the visit, so there is nothing to fill in again.</p>
+          <p className="text-sm text-muted">Anything you already answered in the questionnaire stays with the visit.</p>
         </div>
       )}
 

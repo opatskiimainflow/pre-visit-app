@@ -64,7 +64,7 @@ export default async function AppointmentPage({ params }: PageProps<"/doctor/app
   if (!appt) notFound();
 
   // Earlier visits of this patient with this doctor (RLS: a doctor sees only their own visits).
-  const [{ data: historyRows }, { data: eventRows }, { data: cardRow }] = await Promise.all([
+  const [{ data: historyRows }, { data: eventRows }, { data: cardRow }, { data: prevRows }] = await Promise.all([
     supabase
       .from("appointments")
       .select("id, scheduled_at, reason, status, note:notes(content)")
@@ -80,13 +80,21 @@ export default async function AppointmentPage({ params }: PageProps<"/doctor/app
       .order("created_at")
       .order("id"),
     supabase.from("medical_cards").select("allergies, medications, conditions").eq("patient_id", appt.patient_id).maybeSingle(),
+    // The most recent earlier visit that has a note, for "Since the last visit" (may be older than the list above).
+    supabase
+      .from("appointments")
+      .select("id, scheduled_at, reason, status, note:notes!inner(content)")
+      .eq("patient_id", appt.patient_id)
+      .lt("scheduled_at", appt.scheduled_at)
+      .order("scheduled_at", { ascending: false })
+      .limit(1),
   ]);
   const card = cardRow as MedicalCard | null;
   const events = ((eventRows ?? []) as VisitEvent[]).filter((e) => new Date(e.created_at) <= nowDate());
   const history = (historyRows ?? []) as unknown as History[];
   const completed = appt.status === "completed";
   // Compare with the most recent earlier visit that has a note.
-  const previous = history.find((h) => h.note);
+  const previous = ((prevRows ?? []) as unknown as History[])[0];
   const comparison = previous?.note && appt.note ? compareNotes(previous.note.content, appt.note.content) : null;
 
   const badge =

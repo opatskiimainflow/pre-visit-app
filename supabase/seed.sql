@@ -277,7 +277,7 @@ begin
 
   insert into public.visit_ratings (appointment_id, stars, comment, created_at)
   select a.id,
-         (array[5, 5, 4, 5, 4, 3, 5, 4, 5, 2])[1 + x.h % 10],
+         (array[5, 5, 4, 4, 4, 3, 5, 4, 5, 2])[1 + x.h % 10],
          (array['', 'Very attentive doctor.', '', 'Had to wait 15 minutes, otherwise good.', '',
                 'Everything was explained clearly.', '', 'Quick and professional.', '', 'Felt a bit rushed.'])[1 + x.h % 10],
          least(now() - interval '1 hour', a.completed_at + make_interval(hours => 3 + x.h % 40))

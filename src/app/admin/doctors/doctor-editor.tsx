@@ -3,10 +3,27 @@
 import { useActionState, useRef, useState } from "react";
 import { SubmitButton } from "@/components/buttons";
 import { buttonClass } from "@/components/button-styles";
-import { addDoctor, saveDoctor, setDoctorActive, type DoctorFormState } from "./actions";
+import { formatDay } from "@/lib/format";
+import {
+  addDoctor,
+  addTimeOff,
+  deleteTimeOff,
+  saveDoctor,
+  setDoctorActive,
+  type DoctorFormState,
+  type TimeOffState,
+} from "./actions";
 
 export type Hours = { weekday: number; start_time: string; end_time: string; slot_minutes: number };
-export type Doctor = { id: string; full_name: string; specialty: string | null; active: boolean; hours: Hours[] };
+export type TimeOff = { id: string; start_date: string; end_date: string; note: string };
+export type Doctor = {
+  id: string;
+  full_name: string;
+  specialty: string | null;
+  active: boolean;
+  hours: Hours[];
+  timeOff: TimeOff[];
+};
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -84,7 +101,83 @@ function hoursSummary(hours: Hours[]) {
     .join(" · ");
 }
 
-export function DoctorCard({ doctor }: { doctor: Doctor }) {
+const rangeLabel = (t: TimeOff) =>
+  t.start_date === t.end_date ? formatDay(t.start_date) : `${formatDay(t.start_date)} – ${formatDay(t.end_date)}`;
+
+/** Upcoming days off and a small form to add more. */
+function TimeOffPanel({ doctor, today }: { doctor: Doctor; today: string }) {
+  const formRef = useRef<HTMLFormElement>(null);
+  const [open, setOpen] = useState(false);
+  const [state, action] = useActionState<TimeOffState, FormData>(async (prev, formData) => {
+    const result = await addTimeOff(doctor.id, prev, formData);
+    if (result.ok) {
+      formRef.current?.reset();
+      setOpen(false);
+    }
+    return result;
+  }, {});
+
+  return (
+    <div className="mt-4 border-t border-line pt-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-ink">Time off</p>
+        {!open && (
+          <button type="button" onClick={() => setOpen(true)} className="text-sm font-semibold text-brand-dark hover:text-brand">
+            + Add days off
+          </button>
+        )}
+      </div>
+      {doctor.timeOff.length === 0 && !open && <p className="text-xs text-muted">No days off planned.</p>}
+      {doctor.timeOff.length > 0 && (
+        <ul className="mt-2 flex flex-wrap gap-2">
+          {doctor.timeOff.map((t) => (
+            <li key={t.id} className="flex items-center gap-1.5 rounded-full bg-amber-50 py-1 pr-1 pl-3 text-xs text-amber-900 ring-1 ring-amber-200">
+              <span>
+                <span className="font-semibold">{rangeLabel(t)}</span>
+                {t.note && <span> · {t.note}</span>}
+              </span>
+              <form action={deleteTimeOff.bind(null, t.id)}>
+                <button aria-label={`Remove time off ${rangeLabel(t)}`} className="grid size-5 place-items-center rounded-full hover:bg-amber-200">
+                  ×
+                </button>
+              </form>
+            </li>
+          ))}
+        </ul>
+      )}
+      {open && (
+        <form ref={formRef} action={action} className="@container mt-3 grid gap-2">
+          <div className="grid gap-2 @md:grid-cols-[1fr_1fr_1.4fr]">
+            <label className="grid gap-1 text-xs text-muted">
+              First day
+              <input type="date" name="start_date" required min={today} defaultValue={today} className={field} />
+            </label>
+            <label className="grid gap-1 text-xs text-muted">
+              Last day
+              <input type="date" name="end_date" min={today} className={field} />
+            </label>
+            <label className="grid gap-1 text-xs text-muted">
+              Note (optional)
+              <input name="note" maxLength={120} placeholder="Vacation, conference…" className={field} />
+            </label>
+          </div>
+          {state.error && <p className="text-sm text-red-600">{state.error}</p>}
+          <div className="flex gap-2">
+            <SubmitButton size="sm" pendingText="Saving…">
+              Save days off
+            </SubmitButton>
+            <button type="button" onClick={() => setOpen(false)} className={buttonClass("ghost", "sm")}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+      {state.warning && <p className="mt-2 text-sm text-amber-800">{state.warning}</p>}
+    </div>
+  );
+}
+
+export function DoctorCard({ doctor, today }: { doctor: Doctor; today: string }) {
   const [editing, setEditing] = useState(false);
   const [state, action] = useActionState<DoctorFormState, FormData>(async (prev, formData) => {
     const result = await saveDoctor(doctor.id, prev, formData);
@@ -134,6 +227,7 @@ export function DoctorCard({ doctor }: { doctor: Doctor }) {
           </div>
         </div>
       )}
+      {!editing && doctor.active && <TimeOffPanel doctor={doctor} today={today} />}
     </div>
   );
 }

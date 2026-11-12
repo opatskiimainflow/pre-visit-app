@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 export type FormState = { error?: string; ok?: boolean };
 
 const KINDS = ["short", "long", "yes_no"] as const;
+const PREFILL = ["allergies", "medications", "conditions"];
 
 function readQuestion(formData: FormData) {
   const text = String(formData.get("text") ?? "").trim();
@@ -15,7 +16,16 @@ function readQuestion(formData: FormData) {
   if (text.length < 3) return { error: "Write the question (at least 3 characters)." } as const;
   if (text.length > 300) return { error: "Keep the question under 300 characters." } as const;
   if (!KINDS.includes(kind as (typeof KINDS)[number])) return { error: "Unknown answer type." } as const;
-  return { text, kind, required } as const;
+  // Empty = a regular question. The database checks the parent is a yes/no question of this clinic.
+  const parent_id = String(formData.get("parent_id") ?? "") || null;
+  const prefillRaw = String(formData.get("prefill") ?? "");
+  const prefill = PREFILL.includes(prefillRaw) ? prefillRaw : null;
+  return { text, kind, required, parent_id, prefill } as const;
+}
+
+/** P0001 messages come from the database check on follow-ups and are safe to show. */
+function failure(error: { code?: string; message: string }, fallback: string) {
+  return { error: error.code === "P0001" ? `${error.message}.` : fallback };
 }
 
 function done() {
@@ -40,7 +50,7 @@ export async function addQuestion(_prev: FormState, formData: FormData): Promise
   const { error } = await supabase
     .from("questions")
     .insert({ ...q, clinic_id: profile.clinic_id, position: (last?.position ?? 0) + 1 });
-  return error ? { error: "Could not add the question." } : done();
+  return error ? failure(error, "Could not add the question.") : done();
 }
 
 export async function updateQuestion(id: string, _prev: FormState, formData: FormData): Promise<FormState> {
@@ -50,7 +60,7 @@ export async function updateQuestion(id: string, _prev: FormState, formData: For
 
   const supabase = await createClient();
   const { error } = await supabase.from("questions").update(q).eq("id", id);
-  return error ? { error: "Could not save the question." } : done();
+  return error ? failure(error, "Could not save the question.") : done();
 }
 
 export async function deleteQuestion(id: string): Promise<void> {
@@ -60,12 +70,16 @@ export async function deleteQuestion(id: string): Promise<void> {
   revalidatePath("/admin/questions");
 }
 
-/** Swaps the question with its neighbour above (-1) or below (+1). */
+/** Swaps the question with its neighbour above (-1) or below (+1) among questions on the same level. */
 export async function moveQuestion(id: string, direction: -1 | 1): Promise<void> {
   await requireRole("admin");
   const supabase = await createClient();
-  const { data } = await supabase.from("questions").select("id, position").order("position");
-  const list = data ?? [];
+  const { data } = await supabase.from("questions").select("id, position, parent_id").order("position");
+  const all = data ?? [];
+  const me = all.find((q) => q.id === id);
+  if (!me) return;
+  // Follow-ups move within their question; top-level questions move with their follow-ups.
+  const list = all.filter((q) => q.parent_id === me.parent_id);
   const i = list.findIndex((q) => q.id === id);
   const j = i + direction;
   if (i < 0 || j < 0 || j >= list.length) return;

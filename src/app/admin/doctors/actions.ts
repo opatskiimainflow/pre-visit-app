@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { addDays, kyivDayStartISO, kyivToday, nowDate } from "@/lib/format";
 
 export type DoctorFormState = { error?: string; ok?: boolean };
 
@@ -99,4 +100,48 @@ export async function setDoctorActive(doctorId: string, active: boolean): Promis
   const supabase = await createClient();
   await supabase.from("profiles").update({ active }).eq("id", doctorId).eq("role", "doctor");
   refresh();
+}
+
+export type TimeOffState = { error?: string; ok?: boolean; warning?: string };
+
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Blocks whole days: patients can't book or move visits onto them. Booked visits stay. */
+export async function addTimeOff(doctorId: string, _prev: TimeOffState, formData: FormData): Promise<TimeOffState> {
+  await requireRole("admin");
+  const start = String(formData.get("start_date") ?? "");
+  const end = String(formData.get("end_date") ?? "") || start;
+  const note = String(formData.get("note") ?? "").trim().slice(0, 120);
+  if (!DATE.test(start) || !DATE.test(end)) return { error: "Choose the first and last day." };
+  if (end < start) return { error: "The last day can't be before the first day." };
+  if (end < kyivToday(nowDate())) return { error: "Those days are already in the past." };
+
+  const supabase = await createClient();
+  // RLS: admins only, and only for doctors of their own clinic.
+  const { error } = await supabase.from("doctor_time_off").insert({ doctor_id: doctorId, start_date: start, end_date: end, note });
+  if (error) return { error: "Could not save the time off." };
+
+  // Visits booked before the time off was set are kept; tell the admin about them.
+  const { count } = await supabase
+    .from("appointments")
+    .select("id", { count: "exact", head: true })
+    .eq("doctor_id", doctorId)
+    .eq("status", "scheduled")
+    .gte("scheduled_at", kyivDayStartISO(start))
+    .lt("scheduled_at", kyivDayStartISO(addDays(end, 1)));
+
+  refresh();
+  revalidatePath("/doctor", "layout");
+  return {
+    ok: true,
+    warning: count ? `${count} visit${count === 1 ? " is" : "s are"} already booked on these days. Move or cancel ${count === 1 ? "it" : "them"} on the Appointments tab.` : undefined,
+  };
+}
+
+export async function deleteTimeOff(id: string): Promise<void> {
+  await requireRole("admin");
+  const supabase = await createClient();
+  await supabase.from("doctor_time_off").delete().eq("id", id);
+  refresh();
+  revalidatePath("/doctor", "layout");
 }

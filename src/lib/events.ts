@@ -9,7 +9,7 @@ export type VisitEvent = {
   patient_name: string | null;
   doctor_name: string | null;
   scheduled_at: string | null;
-  details: { reason?: string | null; from?: string; to?: string; model?: string } | null;
+  details: { reason?: string | null; from?: string; to?: string; model?: string; stars?: number } | null;
   created_at: string;
 };
 
@@ -25,6 +25,9 @@ export const ACTIONS: Record<string, { label: string; dot: string }> = {
   note_edited: { label: "Note edited", dot: "bg-violet-500" },
   completed: { label: "Completed", dot: "bg-ink" },
   reopened: { label: "Reopened", dot: "bg-muted" },
+  summary_shared: { label: "Summary", dot: "bg-emerald-600" },
+  rated: { label: "Rated", dot: "bg-amber-400" },
+  reminder_sent: { label: "Reminder", dot: "bg-sky-300" },
 };
 
 /**
@@ -61,6 +64,14 @@ export function describeEvent(e: VisitEvent, withPatient = true) {
       return `completed the visit${withPatient && e.patient_name ? ` with ${e.patient_name}` : ""}`;
     case "reopened":
       return `reopened the visit${withPatient && e.patient_name ? ` with ${e.patient_name}` : ""}`;
+    case "summary_shared":
+      return `shared recommendations${withPatient && e.patient_name ? ` with ${e.patient_name}` : " with the patient"}`;
+    case "rated": {
+      const stars = e.details?.stars ? ` ${e.details.stars}★` : "";
+      return `rated ${self ? "their" : "the"} visit${doc}${stars}`;
+    }
+    case "reminder_sent":
+      return `emailed a questionnaire reminder${withPatient && e.patient_name ? ` to ${e.patient_name}` : ""} for ${when}`;
     default:
       return e.action;
   }

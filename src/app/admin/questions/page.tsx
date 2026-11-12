@@ -14,7 +14,7 @@ export default async function QuestionsPage() {
   // RLS limits this to the admin's own clinic.
   const [{ data: clinic }, { data }] = await Promise.all([
     supabase.from("clinics").select("name").eq("id", profile.clinic_id).single(),
-    supabase.from("questions").select("id, position, text, kind, required").order("position"),
+    supabase.from("questions").select("id, position, text, kind, required, parent_id, prefill").order("position"),
   ]);
 
   return (

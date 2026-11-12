@@ -15,3 +15,20 @@ body {
   background: #ffffff;
   color: var(--color-ink);
 }
+
+/* Follow-up questions slide in when they appear. */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+  }
+}

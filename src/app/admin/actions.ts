@@ -19,6 +19,15 @@ export async function bookAppointment(_prev: BookState, formData: FormData): Pro
   if (new Date(scheduledAt).getTime() < Date.now() - 5 * 60_000) return { error: "That time is in the past." };
 
   const supabase = await createClient();
+  const day = String(formData.get("date") ?? "");
+  const { count: off } = await supabase
+    .from("doctor_time_off")
+    .select("id", { count: "exact", head: true })
+    .eq("doctor_id", doctorId)
+    .lte("start_date", day)
+    .gte("end_date", day);
+  if (off) return { error: "The doctor is off that day (see the Doctors tab)." };
+
   // RLS checks that both people belong to the admin's clinic.
   const { error } = await supabase.from("appointments").insert({
     clinic_id: profile.clinic_id,

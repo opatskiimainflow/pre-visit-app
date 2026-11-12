@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatDateTime } from "@/lib/format";
 import { PageShell } from "@/components/page-shell";
+import { QUESTION_SELECT, type MedicalCard, type Question } from "@/lib/medical-card";
 import { QuestionnaireForm } from "./questionnaire-form";
 
 export const metadata: Metadata = { title: "Questionnaire — PreVisit" };
@@ -22,13 +23,14 @@ export default async function VisitPage({ params }: PageProps<"/patient/visit/[i
   const profile = await requireRole("patient");
   const supabase = await createClient();
 
-  const [{ data }, { data: questions }] = await Promise.all([
+  const [{ data }, { data: questions }, { data: card }] = await Promise.all([
     supabase
       .from("appointments")
       .select("id, scheduled_at, status, doctor:profiles!appointments_doctor_id_fkey(full_name), intake:intakes(id)")
       .eq("id", id)
       .maybeSingle(),
-    supabase.from("questions").select("id, text, kind, required").order("position"),
+    supabase.from("questions").select(QUESTION_SELECT).order("position"),
+    supabase.from("medical_cards").select("allergies, medications, conditions").eq("patient_id", profile.id).maybeSingle(),
   ]);
 
   const appt = data as unknown as Appt | null;
@@ -45,7 +47,11 @@ export default async function VisitPage({ params }: PageProps<"/patient/visit/[i
         <Link href="/patient" className="mb-6 inline-block text-sm text-muted hover:text-brand">
           ← Back to my visits
         </Link>
-        <QuestionnaireForm appointmentId={appt.id} questions={questions ?? []} />
+        <QuestionnaireForm
+          appointmentId={appt.id}
+          questions={(questions ?? []) as Question[]}
+          card={(card as MedicalCard | null) ?? null}
+        />
       </div>
     </PageShell>
   );

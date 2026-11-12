@@ -54,7 +54,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/doctor/
   const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
 
   // RLS limits both queries to the signed-in doctor.
-  const [{ data: visitRows }, { data: hourRows }] = await Promise.all([
+  const [{ data: visitRows }, { data: hourRows }, { data: offRows }] = await Promise.all([
     supabase
       .from("appointments")
       .select(
@@ -65,7 +65,16 @@ export default async function CalendarPage({ searchParams }: PageProps<"/doctor/
       .lt("scheduled_at", kyivDayStartISO(addDays(monday, 7)))
       .order("scheduled_at"),
     supabase.from("doctor_hours").select("weekday, start_time, end_time").eq("doctor_id", profile.id),
+    // Days off set by the clinic admin that overlap this week.
+    supabase
+      .from("doctor_time_off")
+      .select("start_date, end_date, note")
+      .eq("doctor_id", profile.id)
+      .lte("start_date", addDays(monday, 6))
+      .gte("end_date", monday),
   ]);
+  const timeOff = (offRows ?? []) as { start_date: string; end_date: string; note: string }[];
+  const offOn = (d: string) => timeOff.find((t) => t.start_date <= d && d <= t.end_date);
   const visits = (visitRows ?? []) as unknown as Visit[];
   const hours = (hourRows ?? []) as Hours[];
   const byDay = new Map(days.map((d) => [d, visits.filter((v) => kyivDayOf(v.scheduled_at) === d)]));
@@ -111,13 +120,16 @@ export default async function CalendarPage({ searchParams }: PageProps<"/doctor/
           const h = hours.find((x) => x.weekday === i + 1);
           const list = byDay.get(d) ?? [];
           const isToday = d === today;
+          const off = offOn(d);
           return (
             <section
               key={d}
               aria-label={formatDay(d)}
               className={`flex min-w-0 flex-col lg:min-h-40 rounded-2xl border bg-white p-3 ${
                 isToday ? "border-brand ring-2 ring-brand/15" : "border-line"
-              } ${!h && list.length === 0 ? "bg-white/60" : ""}`}
+              } ${off ? "bg-[repeating-linear-gradient(135deg,transparent_0_8px,rgb(254_243_199/0.6)_8px_16px)]" : ""} ${
+                !h && list.length === 0 ? "bg-white/60" : ""
+              }`}
             >
               <header className="mb-3 flex items-baseline justify-between gap-2 lg:block">
                 <p className={`font-semibold ${isToday ? "text-brand-dark" : "text-ink"}`}>
@@ -129,11 +141,17 @@ export default async function CalendarPage({ searchParams }: PageProps<"/doctor/
                   )}
                 </p>
                 <p className="text-xs text-muted">
-                  {h ? `${h.start_time.slice(0, 5)}–${h.end_time.slice(0, 5)}` : "Day off"}
+                  {off ? (
+                    <span className="font-semibold text-amber-800">Time off{off.note ? ` · ${off.note}` : ""}</span>
+                  ) : h ? (
+                    `${h.start_time.slice(0, 5)}–${h.end_time.slice(0, 5)}`
+                  ) : (
+                    "Day off"
+                  )}
                 </p>
               </header>
               {list.length === 0 ? (
-                <p className="text-sm text-muted/70">{h ? "No visits" : ""}</p>
+                <p className="text-sm text-muted/70">{h && !off ? "No visits" : ""}</p>
               ) : (
                 <ul className="grid gap-2">
                   {list.map((v) => {

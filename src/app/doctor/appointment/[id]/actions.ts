@@ -91,3 +91,21 @@ export async function setVisitStatus(appointmentId: string, status: "scheduled" 
     .eq("id", appointmentId);
   refresh(appointmentId);
 }
+
+/** Recommendations for the patient; they see it with the visit once it is completed. */
+export async function saveSummary(appointmentId: string, _prev: SaveState, formData: FormData): Promise<SaveState> {
+  await requireRole("doctor");
+  const body = String(formData.get("summary") ?? "").trim().slice(0, 3000);
+  const supabase = await createClient();
+  // RLS: only the doctor of this visit can write its summary.
+  const { error } = body
+    ? await supabase
+        .from("visit_summaries")
+        .upsert({ appointment_id: appointmentId, body, updated_at: new Date().toISOString() })
+    : await supabase.from("visit_summaries").delete().eq("appointment_id", appointmentId);
+  if (error) return { error: "Could not save the summary." };
+
+  revalidatePath(`/doctor/appointment/${appointmentId}`);
+  revalidatePath("/patient");
+  return { ok: true, savedAt: Date.now() };
+}

@@ -16,11 +16,12 @@ LLM for note generation · Webflow for the marketing site.
 
 | Role         | Sees                                                        |
 | ------------ | ----------------------------------------------------------- |
-| Patient      | Signs up (or uses the demo account), resets a forgotten password, books from doctors' free slots, reschedules or cancels, fills the questionnaire, keeps date of birth/sex up to date |
-| Doctor       | Upcoming list and week calendar, answers, AI note (edit), private notes, visit history, completes visits |
-| Clinic admin | Analytics dashboard, books and cancels visits, patient list, activity log, manages doctors and hours, edits the questionnaire |
+| Patient      | Signs up (or uses the demo account), resets a forgotten password, books from doctors' free slots, reschedules or cancels, fills the questionnaire (follow-up questions appear after a “Yes”, allergies/medications/conditions come pre-filled from the medical card), reads the doctor's recommendations and rates completed visits, gets an email reminder the evening before |
+| Doctor       | Upcoming list and week calendar (with days off), answers, AI note (edit), what changed since the last visit, medical card, summary for the patient, private notes, print/PDF, visit history, completes visits |
+| Clinic admin | Analytics (visits, questionnaire completion, doctor load, patient ratings), books and cancels visits, patient list, activity log, CSV export, manages doctors, hours and time off, edits the questionnaire and its follow-ups |
 
-Every change to a visit (booked, moved, cancelled, answers sent, note created/edited, completed)
+Every change to a visit (booked, moved, cancelled, answers sent, note created/edited, completed,
+summary shared, rated, reminder emailed)
 is recorded by database triggers in `appointment_events`, so the history can't be skipped or edited
 from the app.
 
@@ -36,7 +37,9 @@ each clinic sees only its own data and patients never see the AI note.
    and `supabase/migrations/004_doctor_management.sql` (admins add doctors and edit their hours)
    and `supabase/migrations/005_patient_details.sql` (patient date of birth and sex)
    and `supabase/migrations/006_self_signup.sql` (visitors sign up as patients of the demo clinic).
-   and `supabase/migrations/007_audit_reschedule.sql` (audit log written by triggers, patient rescheduling).
+   and `supabase/migrations/007_audit_reschedule.sql` (audit log written by triggers, patient rescheduling)
+   and `supabase/migrations/008_patient_care.sql` (follow-up questions, medical card, visit summary and rating,
+   doctor time off, email reminders).
    In *Authentication → Sign In / Providers* keep **Allow new users to sign up** on and turn
    **Confirm email** off (the free Supabase mailer only reaches project members).
    In *Authentication → URL Configuration* set **Site URL** to your app URL and add
@@ -46,8 +49,14 @@ each clinic sees only its own data and patients never see the AI note.
    Then run `supabase/seed.sql`: it creates `public.reset_demo()` and fills the demo clinic.
    Run `supabase/demo-cron.sql` to reset the demo every night at 03:00 Kyiv time (pg_cron),
    so visits are always dated today/tomorrow and the patient questionnaire is empty again.
-4. **Env:** copy `.env.example` → `.env.local` and fill in the values.
-5. **Run locally:** `npm run dev` → http://localhost:3000
+4. **Email reminders (optional):** create a free [Resend](https://resend.com) API key and store it in
+   Supabase Vault: `select vault.create_secret('re_…', 'resend_api_key');`. Every day at 16:00 UTC
+   `send_visit_reminders()` (pg_cron + pg_net) emails patients whose visit is tomorrow and whose
+   questionnaire is still empty. Without a verified domain, Resend only delivers to the email of the
+   Resend account owner; add a domain and `select vault.create_secret('PreVisit <hi@your.domain>', 'reminder_from');`
+   to send to anyone. Run `select public.send_visit_reminders();` to send right away.
+5. **Env:** copy `.env.example` → `.env.local` and fill in the values.
+6. **Run locally:** `npm run dev` → http://localhost:3000
 
 ## Deploy to Cloudflare Workers
 

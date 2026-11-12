@@ -6,6 +6,7 @@ import { formatDayLabel, formatTime, kyivDayOf, nowDate } from "@/lib/format";
 import { ACTIONS, EVENT_SELECT, ROLE_LABEL, describeEvent, type VisitEvent } from "@/lib/events";
 import { Empty, PageShell } from "@/components/page-shell";
 import { AdminTabs } from "../admin-tabs";
+import { buttonClass } from "@/components/button-styles";
 
 export const metadata: Metadata = { title: "Activity — PreVisit" };
 
@@ -17,6 +18,8 @@ const FILTERS = [
   { key: "completed", label: "Completed" },
   { key: "intake_submitted", label: "Answers" },
   { key: "note", label: "Notes" },
+  { key: "after", label: "Summaries & ratings" },
+  { key: "reminder_sent", label: "Reminders" },
 ] as const;
 
 export default async function ActivityPage({ searchParams }: PageProps<"/admin/activity">) {
@@ -29,6 +32,7 @@ export default async function ActivityPage({ searchParams }: PageProps<"/admin/a
   // triggers (migrations/007), so nothing here can be edited from the app.
   let query = supabase.from("appointment_events").select(EVENT_SELECT).lte("created_at", nowDate().toISOString());
   if (type === "note") query = query.in("action", ["note_created", "note_edited"]);
+  else if (type === "after") query = query.in("action", ["summary_shared", "rated"]);
   else if (type) query = query.eq("action", type);
   const { data } = await query.order("created_at", { ascending: false }).order("id", { ascending: false }).limit(80);
   const events = (data ?? []) as VisitEvent[];
@@ -46,7 +50,7 @@ export default async function ActivityPage({ searchParams }: PageProps<"/admin/a
     <PageShell profile={profile} title="Activity" subtitle="Who booked, moved, cancelled or completed a visit, and when.">
       <AdminTabs active="/admin/activity" />
 
-      <div className="mb-6 flex flex-wrap gap-2">
+      <div className="mb-6 flex flex-wrap items-center gap-2">
         {FILTERS.map((f) => (
           <Link
             key={f.key}
@@ -59,6 +63,9 @@ export default async function ActivityPage({ searchParams }: PageProps<"/admin/a
             {f.label}
           </Link>
         ))}
+        <a href="/admin/export/activity" download className={`sm:ml-auto ${buttonClass("ghost", "sm")}`}>
+          Export CSV
+        </a>
       </div>
 
       {events.length === 0 ? (

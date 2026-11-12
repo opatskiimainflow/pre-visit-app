@@ -8,6 +8,10 @@ import { ConfirmSubmit } from "@/components/buttons";
 import { buttonClass } from "@/components/button-styles";
 import { cancelMyVisit } from "./book/actions";
 import { DetailsCard } from "./details-card";
+import { MedicalCardPanel } from "./medical-card";
+import { RateForm } from "./rate-form";
+import { Stars } from "@/components/stars";
+import type { MedicalCard } from "@/lib/medical-card";
 
 export const metadata: Metadata = { title: "My visits — PreVisit" };
 
@@ -20,6 +24,15 @@ type Row = {
   intake: { submitted_at: string } | null;
 };
 
+type Past = {
+  id: string;
+  scheduled_at: string;
+  reason: string | null;
+  doctor: { full_name: string; specialty: string | null } | null;
+  summary: { body: string; updated_at: string } | null;
+  rating: { stars: number; comment: string } | null;
+};
+
 export default async function PatientPage({ searchParams }: PageProps<"/patient">) {
   const sp = await searchParams;
   const sent = sp.sent === "1";
@@ -30,16 +43,31 @@ export default async function PatientPage({ searchParams }: PageProps<"/patient"
   const supabase = await createClient();
 
   // RLS limits this to the signed-in patient's own appointments.
-  const { data: me } = await supabase.from("profiles").select("date_of_birth, sex").eq("id", profile.id).single();
-  const { data } = await supabase
-    .from("appointments")
-    .select(
-      "id, scheduled_at, reason, status, doctor:profiles!appointments_doctor_id_fkey(full_name, specialty), intake:intakes(submitted_at)",
-    )
-    .gte("scheduled_at", recentCutoff())
-    .order("scheduled_at");
+  const [{ data: me }, { data: card }, { data }, { data: pastRows }] = await Promise.all([
+    supabase.from("profiles").select("date_of_birth, sex").eq("id", profile.id).single(),
+    supabase.from("medical_cards").select("allergies, medications, conditions, updated_at").eq("patient_id", profile.id).maybeSingle(),
+    supabase
+      .from("appointments")
+      .select(
+        "id, scheduled_at, reason, status, doctor:profiles!appointments_doctor_id_fkey(full_name, specialty), intake:intakes(submitted_at)",
+      )
+      .eq("status", "scheduled")
+      .gte("scheduled_at", recentCutoff())
+      .order("scheduled_at"),
+    // Completed visits, newest first, with the doctor's summary and the patient's own rating.
+    supabase
+      .from("appointments")
+      .select(
+        "id, scheduled_at, reason, doctor:profiles!appointments_doctor_id_fkey(full_name, specialty), summary:visit_summaries(body, updated_at), rating:visit_ratings(stars, comment)",
+      )
+      .eq("status", "completed")
+      .order("scheduled_at", { ascending: false })
+      .limit(10),
+  ]);
 
   const visits = (data ?? []) as unknown as Row[];
+  const past = (pastRows ?? []) as unknown as Past[];
+  const medical = card as (MedicalCard & { updated_at: string }) | null;
   const nowD = nowDate();
   const now = nowD.getTime();
 
@@ -62,6 +90,13 @@ export default async function PatientPage({ searchParams }: PageProps<"/patient"
           summary={patientSummary(me, nowD)}
           birthDate={me?.date_of_birth ? formatBirthDate(me.date_of_birth) : null}
           today={kyivToday(nowD)}
+        />
+      </div>
+
+      <div className="mb-6">
+        <MedicalCardPanel
+          card={medical}
+          updated={medical?.updated_at ? formatBirthDate(kyivToday(new Date(medical.updated_at))) : null}
         />
       </div>
 
@@ -98,6 +133,7 @@ export default async function PatientPage({ searchParams }: PageProps<"/patient"
         </div>
       )}
 
+      <h2 className="mb-4 text-xl font-bold text-ink">Upcoming visits</h2>
       {visits.length === 0 ? (
         <Empty>You have no upcoming visits.</Empty>
       ) : (
@@ -146,6 +182,48 @@ export default async function PatientPage({ searchParams }: PageProps<"/patient"
             );
           })}
         </div>
+      )}
+
+      {past.length > 0 && (
+        <section className="mt-10">
+          <h2 className="mb-4 text-xl font-bold text-ink">Past visits</h2>
+          <div className="grid gap-4">
+            {past.map((v) => (
+              <Card key={v.id}>
+                <div className="grid gap-4 md:grid-cols-[1fr_280px]">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-ink">{formatDateTime(v.scheduled_at)}</p>
+                    <p className="text-sm text-muted">
+                      {v.doctor?.full_name ?? "Doctor"}
+                      {v.reason ? ` · ${v.reason}` : ""}
+                    </p>
+                    {v.summary ? (
+                      <div className="mt-3 rounded-xl bg-soft p-4">
+                        <p className="text-xs font-semibold tracking-wide text-brand-dark uppercase">
+                          Doctor&apos;s recommendations
+                        </p>
+                        <p className="mt-1 text-sm whitespace-pre-line text-ink">{v.summary.body}</p>
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-sm text-muted">No written summary for this visit.</p>
+                    )}
+                  </div>
+                  <div className="md:border-l md:border-line md:pl-5">
+                    {v.rating ? (
+                      <div>
+                        <p className="text-sm text-muted">Your rating</p>
+                        <Stars value={v.rating.stars} />
+                        {v.rating.comment && <p className="mt-1 text-sm text-ink">“{v.rating.comment}”</p>}
+                      </div>
+                    ) : (
+                      <RateForm appointmentId={v.id} />
+                    )}
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </section>
       )}
     </PageShell>
   );

@@ -44,6 +44,8 @@ const appointment = (n, extra = {}) => ({
   intake: n === 0 ? null : { id: id(300 + n), submitted_at: inDays(0, 7), answers: [{ question: "Why?", answer: "Pain" }] },
   note: n >= 2 ? { id: id(400 + n), content: NOTE, model: n === 2 ? "demo-rules" : "claude-haiku-5-5", created_at: inDays(0, 7), edited_at: null } : null,
   doctor_note: n === 3 ? { body: "BP 150/95" } : null,
+  summary: n === 3 ? { body: "Rest and fluids.\n• Come back in 2 weeks", updated_at: inDays(0, 13) } : null,
+  rating: n === 3 ? { stars: 4, comment: "Very attentive" } : null,
   ...extra,
 });
 
@@ -55,10 +57,22 @@ function rows(table) {
       return [{ id: CLINIC, name: "Sunrise Family Clinic" }];
     case "questions":
       return [
-        { id: id(500), position: 1, text: "What is the main reason for your visit?", kind: "long", required: true },
-        { id: id(501), position: 2, text: "Chest pain?", kind: "yes_no", required: true },
-        { id: id(502), position: 3, text: "Allergies?", kind: "short", required: false },
+        { id: id(500), position: 1, text: "What is the main reason for your visit?", kind: "long", required: true, parent_id: null, prefill: null },
+        { id: id(501), position: 2, text: "Chest pain?", kind: "yes_no", required: true, parent_id: null, prefill: null },
+        { id: id(503), position: 4, text: "What happened?", kind: "long", required: true, parent_id: id(501), prefill: null },
+        { id: id(502), position: 3, text: "Allergies?", kind: "short", required: false, parent_id: null, prefill: "allergies" },
       ];
+    case "medical_cards":
+      return [{ patient_id: USERS.patient.id, allergies: "None", medications: "Salbutamol inhaler", conditions: "Mild asthma", updated_at: inDays(-2, 9) }];
+    case "doctor_time_off":
+      return [{ id: id(600), doctor_id: USERS.doctor.id, start_date: inDays(2, 0).slice(0, 10), end_date: inDays(3, 0).slice(0, 10), note: "Conference" }];
+    case "visit_ratings":
+      return [5, 4, 5, 3].map((stars, i) => ({
+        stars,
+        comment: i % 2 ? "" : "Clear advice, thank you",
+        created_at: inDays(-i - 1, 10),
+        appointment: { doctor_id: i % 2 ? DOCTOR2.id : USERS.doctor.id, patient: { full_name: PATIENT2.full_name } },
+      }));
     case "appointments":
       return [0, 1, 2, 3].map((n) => appointment(n));
     case "doctor_hours":
@@ -67,7 +81,7 @@ function rows(table) {
         ...[2, 4].map((w) => ({ doctor_id: DOCTOR2.id, weekday: w, start_time: "10:00:00", end_time: "16:00:00", slot_minutes: 30 })),
       ];
     case "appointment_events":
-      return ["booked", "intake_submitted", "note_created", "rescheduled", "completed", "cancelled"].map((action, i) => ({
+      return ["booked", "intake_submitted", "note_created", "rescheduled", "completed", "cancelled", "summary_shared", "rated", "reminder_sent"].map((action, i) => ({
         id: i + 1,
         appointment_id: id(201),
         patient_id: PATIENT2.id,
@@ -78,7 +92,7 @@ function rows(table) {
         patient_name: PATIENT2.full_name,
         doctor_name: USERS.doctor.full_name,
         scheduled_at: inDays(1, 9),
-        details: action === "rescheduled" ? { from: inDays(1, 8), to: inDays(1, 9) } : { reason: "Headaches" },
+        details: action === "rescheduled" ? { from: inDays(1, 8), to: inDays(1, 9) } : action === "rated" ? { stars: 5 } : { reason: "Headaches" },
         created_at: inDays(-i, 10),
       }));
     default:

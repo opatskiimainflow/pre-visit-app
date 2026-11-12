@@ -4,7 +4,7 @@
 -- visits dated "today" and "tomorrow", then runs it once.
 -- supabase/demo-cron.sql schedules it to run every night, so the live demo always looks fresh.
 --
--- Run AFTER schema.sql and all migrations (002–007).
+-- Run AFTER schema.sql and all migrations (002–008).
 --
 -- Before the first run: create three users in Supabase → Authentication → Users → Add user
 -- (tick "Auto Confirm User"), all with the same password = your DEMO_PASSWORD:
@@ -59,6 +59,9 @@ begin
     (v_admin,   v_clinic, 'admin',   'Iryna Bondar');
   update public.profiles set specialty = 'Family medicine' where id = v_doctor;
   update public.profiles set date_of_birth = date '1990-03-14', sex = 'female' where id = v_patient;
+  -- Her medical card fills three questionnaire answers in advance.
+  insert into public.medical_cards (patient_id, allergies, medications, conditions)
+  values (v_patient, 'None', 'Salbutamol inhaler when needed', 'Mild asthma');
 
   -- A second (fictional, no login) doctor so patients have a choice.
   insert into auth.users (id, instance_id, aud, role, email, created_at, updated_at,
@@ -76,14 +79,23 @@ begin
   union all select v_doc2, 4, time '10:00', time '16:00', 30
   union all select v_doc2, 6, time '10:00', time '13:00', 30;
 
-  insert into public.questions (clinic_id, position, text, kind, required) values
-    (v_clinic, 1, 'What is the main reason for your visit?', 'long', true),
-    (v_clinic, 2, 'When did it start, and is it getting better or worse?', 'short', true),
-    (v_clinic, 3, 'Which medications do you take right now (including supplements)?', 'long', true),
-    (v_clinic, 4, 'Do you have any allergies to medicines or food?', 'short', true),
-    (v_clinic, 5, 'Do you have any chronic conditions (e.g. diabetes, asthma, hypertension)?', 'short', false),
-    (v_clinic, 6, 'Have you had chest pain, shortness of breath or fainting recently?', 'yes_no', true),
-    (v_clinic, 7, 'Anything else you want your doctor to know?', 'long', false);
+  -- prefill: answered in advance from the patient's medical card (migrations/008).
+  insert into public.questions (clinic_id, position, text, kind, required, prefill) values
+    (v_clinic, 1, 'What is the main reason for your visit?', 'long', true, null),
+    (v_clinic, 2, 'When did it start, and is it getting better or worse?', 'short', true, null),
+    (v_clinic, 3, 'Which medications do you take right now (including supplements)?', 'long', true, 'medications'),
+    (v_clinic, 4, 'Do you have any allergies to medicines or food?', 'short', true, 'allergies'),
+    (v_clinic, 5, 'Do you have any chronic conditions (e.g. diabetes, asthma, hypertension)?', 'short', false, 'conditions'),
+    (v_clinic, 6, 'Have you had chest pain, shortness of breath or fainting recently?', 'yes_no', true, null),
+    (v_clinic, 8, 'Do you smoke or vape?', 'yes_no', false, null),
+    (v_clinic, 10, 'Anything else you want your doctor to know?', 'long', false, null);
+  -- Follow-ups: shown only after a "Yes" to the question above them.
+  insert into public.questions (clinic_id, position, text, kind, required, parent_id)
+  select v_clinic, 7, 'What exactly happened, when, and how long did it last?', 'long', true, id
+  from public.questions where clinic_id = v_clinic and position = 6;
+  insert into public.questions (clinic_id, position, text, kind, required, parent_id)
+  select v_clinic, 9, 'How much per day, and for how many years?', 'short', true, id
+  from public.questions where clinic_id = v_clinic and position = 8;
 
   -- The demo patient's upcoming visit (questionnaire not filled yet).
   insert into public.appointments (clinic_id, patient_id, doctor_id, scheduled_at, reason)
@@ -107,6 +119,9 @@ begin
   update public.profiles set date_of_birth = date '1982-07-02', sex = 'male'   where id = v_extra[1];
   update public.profiles set date_of_birth = date '1996-11-23', sex = 'female' where id = v_extra[2];
   update public.profiles set date_of_birth = date '1959-01-30', sex = 'male'   where id = v_extra[3];
+  insert into public.medical_cards (patient_id, allergies, medications, conditions) values
+    (v_extra[1], 'Penicillin (rash)', 'Lisinopril 10 mg', 'High blood pressure'),
+    (v_extra[2], 'None', 'Levothyroxine 50 mcg', 'Hypothyroidism');
 
   -- 09:00 — answers in and note ready
   insert into public.appointments (clinic_id, patient_id, doctor_id, scheduled_at, reason)
@@ -143,6 +158,14 @@ begin
     "red_flags":[],
     "questions_for_doctor":["Screen time per day?"]
   }');
+  insert into public.visit_summaries (appointment_id, body, updated_at) values (v_appt,
+    'Blood pressure 138/88. Likely tension-type headaches from long screen hours.' || chr(10) ||
+    '• Take a 5-minute break from the screen every hour.' || chr(10) ||
+    '• Use ibuprofen no more than 2–3 days a week.' || chr(10) ||
+    '• Measure your blood pressure at home twice a week and bring the numbers next time.',
+    today - interval '21 days' + interval '11 hours');
+  insert into public.visit_ratings (appointment_id, stars, comment, created_at)
+  values (v_appt, 5, 'Clear advice and no rush. Thank you!', today - interval '20 days' + interval '9 hours');
 
   -- 11:30 — answers in, note not generated yet
   insert into public.appointments (clinic_id, patient_id, doctor_id, scheduled_at, reason)
@@ -239,6 +262,35 @@ begin
     end if;
   end loop;
 
+  -- After-visit summaries (2 of 3 visits) and ratings (3 of 4), deterministic per visit.
+  insert into public.visit_summaries (appointment_id, body, updated_at)
+  select a.id,
+         (array['Examined today, nothing urgent found. Rest, fluids and come back if it gets worse.',
+                'Results discussed. Continue the current medication and repeat the tests in 3 months.',
+                'Referral to a specialist given. Book the follow-up once you have the results.',
+                'Blood pressure fine today. Keep up the walks and cut down on salt.'])[1 + x.h % 4],
+         a.completed_at + interval '20 minutes'
+  from public.appointments a
+  cross join lateral (select abs(hashtext(a.id::text)) as h) x
+  where a.clinic_id = v_clinic and a.status = 'completed' and x.h % 3 <> 0
+    and not exists (select 1 from public.visit_summaries s where s.appointment_id = a.id);
+
+  insert into public.visit_ratings (appointment_id, stars, comment, created_at)
+  select a.id,
+         (array[5, 5, 4, 5, 4, 3, 5, 4, 5, 2])[1 + x.h % 10],
+         (array['', 'Very attentive doctor.', '', 'Had to wait 15 minutes, otherwise good.', '',
+                'Everything was explained clearly.', '', 'Quick and professional.', '', 'Felt a bit rushed.'])[1 + x.h % 10],
+         least(now() - interval '1 hour', a.completed_at + make_interval(hours => 3 + x.h % 40))
+  from public.appointments a
+  cross join lateral (select abs(hashtext(a.id::text || 'r')) as h) x
+  where a.clinic_id = v_clinic and a.status = 'completed' and x.h % 4 <> 0
+    and not exists (select 1 from public.visit_ratings r where r.appointment_id = a.id);
+
+  -- Time off: Dr. Petrenko at a conference in two weeks, Dr. Melnyk takes a day next week.
+  insert into public.doctor_time_off (doctor_id, start_date, end_date, note) values
+    (v_doc2,   v_today + 15, v_today + 19, 'Cardiology conference'),
+    (v_doctor, v_today + 8,  v_today + 8,  'Personal day');
+
   -- A believable activity log for everything above (who booked, filled in, completed).
   insert into public.appointment_events (clinic_id, appointment_id, patient_id, doctor_id,
       actor_id, actor_name, actor_role, action, patient_name, doctor_name, scheduled_at, details, created_at)
@@ -278,6 +330,26 @@ begin
   join public.profiles p on p.id = a.patient_id
   join public.profiles d on d.id = a.doctor_id
   where a.clinic_id = v_clinic and a.status = 'completed';
+
+  insert into public.appointment_events (clinic_id, appointment_id, patient_id, doctor_id,
+      actor_id, actor_name, actor_role, action, patient_name, doctor_name, scheduled_at, created_at)
+  select a.clinic_id, a.id, a.patient_id, a.doctor_id, a.doctor_id, d.full_name, 'doctor',
+         'summary_shared', p.full_name, d.full_name, a.scheduled_at, s.updated_at
+  from public.visit_summaries s
+  join public.appointments a on a.id = s.appointment_id
+  join public.profiles p on p.id = a.patient_id
+  join public.profiles d on d.id = a.doctor_id
+  where a.clinic_id = v_clinic;
+
+  insert into public.appointment_events (clinic_id, appointment_id, patient_id, doctor_id,
+      actor_id, actor_name, actor_role, action, patient_name, doctor_name, scheduled_at, details, created_at)
+  select a.clinic_id, a.id, a.patient_id, a.doctor_id, a.patient_id, p.full_name, 'patient',
+         'rated', p.full_name, d.full_name, a.scheduled_at, jsonb_build_object('stars', r.stars), r.created_at
+  from public.visit_ratings r
+  join public.appointments a on a.id = r.appointment_id
+  join public.profiles p on p.id = a.patient_id
+  join public.profiles d on d.id = a.doctor_id
+  where a.clinic_id = v_clinic;
 
   perform set_config('previsit.skip_audit', 'off', true);
 end $$;

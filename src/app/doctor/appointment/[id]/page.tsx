@@ -14,6 +14,12 @@ import { GenerateNoteButton } from "./generate-button";
 import { NoteCard } from "./note-card";
 import { DoctorNotes } from "./doctor-notes";
 import { setVisitStatus } from "./actions";
+import { SummaryForm } from "./summary-form";
+import { ComparisonCard } from "./comparison-card";
+import { compareNotes } from "@/lib/compare";
+import { CARD_FIELDS, type MedicalCard } from "@/lib/medical-card";
+import { buttonClass } from "@/components/button-styles";
+import { Stars } from "@/components/stars";
 
 export const metadata: Metadata = { title: "Visit — PreVisit" };
 
@@ -28,6 +34,8 @@ type Appt = {
   intake: { answers: Answer[]; submitted_at: string } | null;
   note: { content: Note; model: string | null; created_at: string; edited_at: string | null } | null;
   doctor_note: { body: string } | null;
+  summary: { body: string } | null;
+  rating: { stars: number; comment: string } | null;
 };
 
 type History = {
@@ -47,7 +55,7 @@ export default async function AppointmentPage({ params }: PageProps<"/doctor/app
   const { data } = await supabase
     .from("appointments")
     .select(
-      "id, scheduled_at, reason, status, completed_at, patient_id, patient:profiles!appointments_patient_id_fkey(full_name, date_of_birth, sex), intake:intakes(answers, submitted_at), note:notes(content, model, created_at, edited_at), doctor_note:doctor_notes(body)",
+      "id, scheduled_at, reason, status, completed_at, patient_id, patient:profiles!appointments_patient_id_fkey(full_name, date_of_birth, sex), intake:intakes(answers, submitted_at), note:notes(content, model, created_at, edited_at), doctor_note:doctor_notes(body), summary:visit_summaries(body), rating:visit_ratings(stars, comment)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -56,7 +64,7 @@ export default async function AppointmentPage({ params }: PageProps<"/doctor/app
   if (!appt) notFound();
 
   // Earlier visits of this patient with this doctor (RLS: a doctor sees only their own visits).
-  const [{ data: historyRows }, { data: eventRows }] = await Promise.all([
+  const [{ data: historyRows }, { data: eventRows }, { data: cardRow }] = await Promise.all([
     supabase
       .from("appointments")
       .select("id, scheduled_at, reason, status, note:notes(content)")
@@ -71,10 +79,15 @@ export default async function AppointmentPage({ params }: PageProps<"/doctor/app
       .eq("appointment_id", appt.id)
       .order("created_at")
       .order("id"),
+    supabase.from("medical_cards").select("allergies, medications, conditions").eq("patient_id", appt.patient_id).maybeSingle(),
   ]);
+  const card = cardRow as MedicalCard | null;
   const events = ((eventRows ?? []) as VisitEvent[]).filter((e) => new Date(e.created_at) <= nowDate());
   const history = (historyRows ?? []) as unknown as History[];
   const completed = appt.status === "completed";
+  // Compare with the most recent earlier visit that has a note.
+  const previous = history.find((h) => h.note);
+  const comparison = previous?.note && appt.note ? compareNotes(previous.note.content, appt.note.content) : null;
 
   const badge =
     appt.note?.model === DEMO_MODEL || appt.note?.model === "demo-seed" ? (
@@ -96,6 +109,9 @@ export default async function AppointmentPage({ params }: PageProps<"/doctor/app
           ← All appointments
         </Link>
         <div className="flex flex-wrap items-center gap-3">
+          <Link href={`/doctor/appointment/${appt.id}/print`} target="_blank" className={buttonClass("ghost", "sm")}>
+            Print / PDF
+          </Link>
           <StatusChip visit={appt} />
           {completed && appt.completed_at && (
             <span className="text-sm text-muted">{formatDateTime(appt.completed_at)}</span>
@@ -130,10 +146,34 @@ export default async function AppointmentPage({ params }: PageProps<"/doctor/app
               <p className="mt-1 text-muted">The questionnaire hasn&apos;t been filled in yet.</p>
             </Card>
           )}
+          {comparison && previous && <ComparisonCard previous={previous} comparison={comparison} />}
+          <SummaryForm appointmentId={appt.id} body={appt.summary?.body ?? ""} completed={completed} />
           <DoctorNotes appointmentId={appt.id} body={appt.doctor_note?.body ?? ""} />
         </section>
 
         <aside className="grid content-start gap-6">
+          {appt.rating && (
+            <Card>
+              <h2 className="font-bold text-ink">Patient&apos;s rating</h2>
+              <Stars value={appt.rating.stars} />
+              {appt.rating.comment && <p className="mt-1 text-sm text-ink">“{appt.rating.comment}”</p>}
+            </Card>
+          )}
+          <Card>
+            <h2 className="font-bold text-ink">Medical card</h2>
+            {card && CARD_FIELDS.some((f) => card[f.key]) ? (
+              <dl className="mt-3 grid gap-3">
+                {CARD_FIELDS.map((f) => (
+                  <div key={f.key}>
+                    <dt className="text-sm text-muted">{f.label}</dt>
+                    <dd className="text-ink">{card[f.key] || "—"}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : (
+              <p className="mt-2 text-sm text-muted">The patient hasn&apos;t filled in their medical card.</p>
+            )}
+          </Card>
           <Card>
             <h2 className="font-bold text-ink">Previous visits</h2>
             {history.length === 0 ? (

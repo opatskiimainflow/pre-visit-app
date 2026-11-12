@@ -6,6 +6,7 @@ import { Empty, PageShell } from "@/components/page-shell";
 import { ConfirmSubmit } from "@/components/buttons";
 import { StatusChip } from "@/components/status-chip";
 import { AdminTabs } from "./admin-tabs";
+import { buttonClass } from "@/components/button-styles";
 import { BookForm } from "./book-form";
 import { cancelAppointment } from "./actions";
 
@@ -48,6 +49,11 @@ export default async function AdminPage() {
   return (
     <PageShell profile={profile} title="Clinic appointments" subtitle={clinic?.name ?? "Your clinic"}>
       <AdminTabs active="/admin" />
+      <div className="-mt-4 mb-4 flex justify-end">
+        <a href="/admin/export/visits" download className={buttonClass("ghost", "sm")}>
+          Export all visits (CSV)
+        </a>
+      </div>
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <section className="grid content-start gap-3">
           {rows.length === 0 ? (

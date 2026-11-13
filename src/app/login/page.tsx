@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { isLocale } from "@/lib/i18n/config";
 import { AuthShell } from "@/components/auth-shell";
 import { getT } from "@/lib/i18n/server";
 import { DemoLogin, EmailLogin } from "./login-forms";
@@ -9,7 +11,10 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t.auth.loginTitle };
 }
 
-export default async function LoginPage() {
+export default async function LoginPage({ searchParams }: PageProps<"/login">) {
+  // Links from the marketing site carry ?lang=uk|en: save it, then come back without the parameter.
+  const { lang } = await searchParams;
+  if (isLocale(lang)) redirect(`/lang/${lang}?next=/login`);
   const { locale, t } = await getT();
   return (
     <AuthShell

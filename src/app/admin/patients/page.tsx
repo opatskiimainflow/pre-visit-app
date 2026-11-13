@@ -4,8 +4,12 @@ import { createClient } from "@/lib/supabase/server";
 import { formatBirthDate, formatDateTime, nowDate, patientSummary } from "@/lib/format";
 import { Empty, PageShell } from "@/components/page-shell";
 import { AdminTabs } from "../admin-tabs";
+import { getT } from "@/lib/i18n/server";
 
-export const metadata: Metadata = { title: "Patients — PreVisit" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return { title: t.admin.patientsTitle };
+}
 
 type Visit = { patient_id: string; scheduled_at: string; status: string; doctor: { full_name: string } | null };
 
@@ -34,43 +38,46 @@ export default async function PatientsPage() {
     };
   });
 
+  const { locale, t } = await getT();
+  const a = t.admin;
+
   return (
-    <PageShell profile={profile} title="Patients" subtitle={clinic?.name ?? "Your clinic"}>
+    <PageShell profile={profile} title={a.tabs.patients} subtitle={clinic?.name ?? a.yourClinic}>
       <AdminTabs active="/admin/patients" />
       {rows.length === 0 ? (
-        <Empty>No patients yet.</Empty>
+        <Empty>{a.noPatients}</Empty>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-line bg-white">
           <div className="hidden grid-cols-[1.4fr_1fr_0.6fr_1.4fr] gap-4 border-b border-line px-5 py-3 text-xs font-semibold tracking-wide text-muted uppercase md:grid">
-            <span>Patient</span>
-            <span>Born</span>
-            <span>Past visits</span>
-            <span>Next visit</span>
+            <span>{a.cols.patient}</span>
+            <span>{a.cols.born}</span>
+            <span>{a.cols.pastVisits}</span>
+            <span>{a.cols.nextVisit}</span>
           </div>
           <ul className="divide-y divide-line">
             {rows.map((p) => (
               <li key={p.id} className="grid gap-1 px-5 py-4 md:grid-cols-[1.4fr_1fr_0.6fr_1.4fr] md:items-center md:gap-4">
                 <div>
                   <p className="font-semibold text-ink">{p.full_name}</p>
-                  <p className="text-sm text-muted">{patientSummary(p, now) ?? "Age and sex not given"}</p>
+                  <p className="text-sm text-muted">{patientSummary(p, now, locale) ?? a.noAgeSex}</p>
                 </div>
                 <p className="text-sm text-ink">
-                  <span className="text-muted md:hidden">Born: </span>
-                  {p.date_of_birth ? formatBirthDate(p.date_of_birth) : "—"}
+                  <span className="text-muted md:hidden">{a.cols.born}: </span>
+                  {p.date_of_birth ? formatBirthDate(p.date_of_birth, locale) : "—"}
                 </p>
                 <p className="text-sm text-ink">
-                  <span className="text-muted md:hidden">Completed visits: </span>
+                  <span className="text-muted md:hidden">{a.completedVisits}: </span>
                   {p.completed}
                 </p>
                 <p className="text-sm text-ink">
-                  <span className="text-muted md:hidden">Next visit: </span>
+                  <span className="text-muted md:hidden">{a.cols.nextVisit}: </span>
                   {p.next ? (
                     <>
-                      {formatDateTime(p.next.scheduled_at)}
+                      {formatDateTime(p.next.scheduled_at, locale)}
                       <span className="block text-muted">{p.next.doctor?.full_name}</span>
                     </>
                   ) : (
-                    <span className="text-muted">None booked</span>
+                    <span className="text-muted">{a.noneBooked}</span>
                   )}
                 </p>
               </li>

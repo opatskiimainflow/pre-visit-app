@@ -1,28 +1,37 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { SessionRefresher } from "@/components/session-refresher";
+import { I18nProvider } from "@/lib/i18n/client";
+import { getT } from "@/lib/i18n/server";
 import "./globals.css";
 
-// Inter (variable, latin), bundled with the app so builds don't need Google Fonts.
+// Inter (variable), bundled with the app so builds don't need Google Fonts.
+// Latin and Cyrillic are separate files; the font stack falls back glyph by glyph.
 const inter = localFont({
   src: "./fonts/inter-latin-wght-normal.woff2",
   variable: "--font-inter",
   weight: "100 900",
   display: "swap",
 });
+const interCyrillic = localFont({
+  src: "./fonts/inter-cyrillic-wght-normal.woff2",
+  variable: "--font-inter-cyrillic",
+  weight: "100 900",
+  display: "swap",
+});
 
-export const metadata: Metadata = {
-  title: "PreVisit — AI pre-visit notes for clinics",
-  description:
-    "PreVisit turns a short patient questionnaire into a structured note for the doctor, ready before the appointment.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return { title: t.common.appTitle, description: t.common.appDescription };
+}
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const { locale } = await getT();
   return (
-    <html lang="en" className={`${inter.variable} h-full antialiased`}>
+    <html lang={locale} className={`${inter.variable} ${interCyrillic.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
         <SessionRefresher />
-        {children}
+        <I18nProvider locale={locale}>{children}</I18nProvider>
       </body>
     </html>
   );

@@ -2,12 +2,13 @@
 
 import { useActionState, useState } from "react";
 import { SubmitButton } from "@/components/buttons";
+import { useT } from "@/lib/i18n/client";
 import { rateVisit, type RateState } from "./actions";
-
-const LABELS = ["", "Poor", "Fair", "Good", "Very good", "Excellent"];
 
 /** 1–5 stars and an optional comment, once per completed visit. */
 export function RateForm({ appointmentId }: { appointmentId: string }) {
+  const { t } = useT();
+  const p = t.patient;
   const [state, action] = useActionState<RateState, FormData>(rateVisit.bind(null, appointmentId), {});
   const [stars, setStars] = useState(0);
   const [hover, setHover] = useState(0);
@@ -16,7 +17,7 @@ export function RateForm({ appointmentId }: { appointmentId: string }) {
   return (
     <form action={action} className="grid gap-3">
       <fieldset>
-        <legend className="mb-1 text-sm font-semibold text-ink">How was your visit?</legend>
+        <legend className="mb-1 text-sm font-semibold text-ink">{p.howWasVisit}</legend>
         <div className="flex items-center gap-1" onMouseLeave={() => setHover(0)}>
           {[1, 2, 3, 4, 5].map((n) => (
             <label key={n} className="cursor-pointer" onMouseEnter={() => setHover(n)}>
@@ -36,12 +37,10 @@ export function RateForm({ appointmentId }: { appointmentId: string }) {
               >
                 ★
               </span>
-              <span className="sr-only">
-                {n} {n === 1 ? "star" : "stars"}
-              </span>
+              <span className="sr-only">{p.star(n)}</span>
             </label>
           ))}
-          <span className="ml-2 text-sm text-muted">{LABELS[shown]}</span>
+          <span className="ml-2 text-sm text-muted">{p.starLabels[shown]}</span>
         </div>
       </fieldset>
       {stars > 0 && (
@@ -50,12 +49,12 @@ export function RateForm({ appointmentId }: { appointmentId: string }) {
             name="comment"
             rows={2}
             maxLength={1000}
-            placeholder="Anything to add? (optional)"
+            placeholder={p.anythingToAdd}
             className="w-full rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-brand"
           />
           <div>
-            <SubmitButton size="sm" pendingText="Sending…">
-              Send rating
+            <SubmitButton size="sm" pendingText={t.common.sending}>
+              {p.sendRating}
             </SubmitButton>
           </div>
         </>

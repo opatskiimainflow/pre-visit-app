@@ -7,9 +7,13 @@ import { formatDateTime, nowDate } from "@/lib/format";
 import { loadFreeDays } from "@/lib/slots";
 import { Card, PageShell } from "@/components/page-shell";
 import { SlotPicker } from "@/components/slot-picker";
+import { getT } from "@/lib/i18n/server";
 import { RescheduleForm } from "./reschedule-form";
 
-export const metadata: Metadata = { title: "Reschedule visit — PreVisit" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return { title: t.patient.rescheduleTitle };
+}
 
 type Visit = {
   id: string;
@@ -45,23 +49,25 @@ export default async function ReschedulePage({ params, searchParams }: PageProps
 
   const day = days.includes(pick("day") ?? "") ? pick("day")! : firstOpen;
   const slot = (day && slotsByDay.get(day)?.includes(pick("slot") ?? "") && pick("slot")) || undefined;
+  const { locale, t } = await getT();
+  const p = t.patient;
   const href = (d: string, s?: string) =>
     `/patient/reschedule/${visit.id}?${new URLSearchParams(s ? { day: d, slot: s } : { day: d })}`;
 
   return (
     <PageShell
       profile={profile}
-      title="Reschedule visit"
-      subtitle={`${doctor.full_name} · now ${formatDateTime(visit.scheduled_at)}${visit.reason ? ` · ${visit.reason}` : ""}`}
+      title={p.rescheduleHeading}
+      subtitle={`${doctor.full_name} · ${p.now(formatDateTime(visit.scheduled_at, locale))}${visit.reason ? ` · ${visit.reason}` : ""}`}
     >
       <Link href="/patient" className="mb-6 inline-block text-sm text-muted hover:text-brand">
-        ← Back to my visits
+        {p.back}
       </Link>
 
       {!movable ? (
         <Card>
-          <p className="font-semibold text-ink">This visit can no longer be moved.</p>
-          <p className="mt-1 text-muted">Only upcoming visits that are not completed can be rescheduled.</p>
+          <p className="font-semibold text-ink">{p.cannotMove}</p>
+          <p className="mt-1 text-muted">{p.cannotMoveText}</p>
         </Card>
       ) : (
         <div className="grid gap-8">
@@ -72,21 +78,19 @@ export default async function ReschedulePage({ params, searchParams }: PageProps
             slot={slot}
             hrefFor={href}
             doctorName={doctor.full_name}
-            dayStep="1 · New day"
-            timeStep="2 · New time"
+            dayStep={p.stepNewDay}
+            timeStep={p.stepNewTime}
           />
           {slot && (
             <section className="max-w-xl">
               <Card>
-                <h2 className="text-lg font-bold text-ink">Move your visit</h2>
+                <h2 className="text-lg font-bold text-ink">{p.moveVisit}</h2>
                 <p className="mt-1 text-muted">
-                  <span className="line-through">{formatDateTime(visit.scheduled_at)}</span>
+                  <span className="line-through">{formatDateTime(visit.scheduled_at, locale)}</span>
                   <span className="mx-2">→</span>
-                  <span className="font-semibold text-ink">{formatDateTime(slot)}</span>
+                  <span className="font-semibold text-ink">{formatDateTime(slot, locale)}</span>
                 </p>
-                <p className="mt-1 mb-5 text-sm text-muted">
-                  Your answers and the doctor&apos;s notes stay with the visit.
-                </p>
+                <p className="mt-1 mb-5 text-sm text-muted">{p.moveKeeps}</p>
                 <RescheduleForm appointmentId={visit.id} slot={slot} />
               </Card>
             </section>

@@ -20,6 +20,11 @@ LLM for note generation · Webflow for the marketing site.
 | Doctor       | Upcoming list and week calendar (with days off), answers, AI note (edit), what changed since the last visit, medical card, summary for the patient, private notes, print/PDF, visit history, completes visits |
 | Clinic admin | Analytics (visits, questionnaire completion, doctor load, patient ratings), books and cancels visits, patient list, activity log, CSV export, manages doctors, hours and time off, edits the questionnaire and its follow-ups |
 
+**Languages:** the whole app is in English and Ukrainian, with a UA/EN switch in the header and on
+the sign-in pages. The choice is kept in a `lang` cookie; on the first visit it follows the browser
+language. Dates use the matching locale, the AI note is written in the language of whoever generates
+it, and admins can give each questionnaire question a Ukrainian text (`questions.text_uk`).
+
 Every change to a visit (booked, moved, cancelled, answers sent, note created/edited, completed,
 summary shared, rated, reminder emailed)
 is recorded by database triggers in `appointment_events`, so the history can't be skipped or edited
@@ -39,7 +44,8 @@ each clinic sees only its own data and patients never see the AI note.
    and `supabase/migrations/006_self_signup.sql` (visitors sign up as patients of the demo clinic).
    and `supabase/migrations/007_audit_reschedule.sql` (audit log written by triggers, patient rescheduling)
    and `supabase/migrations/008_patient_care.sql` (follow-up questions, medical card, visit summary and rating,
-   doctor time off, email reminders).
+   doctor time off, email reminders)
+   and `supabase/migrations/009_ukrainian_questions.sql` (Ukrainian text for questionnaire questions).
    In *Authentication → Sign In / Providers* keep **Allow new users to sign up** on and turn
    **Confirm email** off (the free Supabase mailer only reaches project members).
    In *Authentication → URL Configuration* set **Site URL** to your app URL and add

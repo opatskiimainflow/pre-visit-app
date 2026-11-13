@@ -1,16 +1,21 @@
-export function formatDateTime(iso: string) {
-  return new Intl.DateTimeFormat("en-GB", {
+import { intlLocale, type Locale } from "@/lib/i18n/config";
+
+/** Ukrainian Intl output starts lowercase ("чт, 12 лист."); capitalise it for labels. */
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+export function formatDateTime(iso: string, locale: Locale = "en") {
+  return cap(new Intl.DateTimeFormat(intlLocale(locale), {
     weekday: "short",
     day: "numeric",
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
     timeZone: "Europe/Kyiv",
-  }).format(new Date(iso));
+  }).format(new Date(iso)));
 }
 
-export function formatTime(iso: string) {
-  return new Intl.DateTimeFormat("en-GB", {
+export function formatTime(iso: string, locale: Locale = "en") {
+  return new Intl.DateTimeFormat(intlLocale(locale), {
     hour: "2-digit",
     minute: "2-digit",
     timeZone: "Europe/Kyiv",
@@ -21,16 +26,16 @@ const dayKey = (d: Date) =>
   new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Kyiv" }).format(d); // YYYY-MM-DD
 
 /** "Today", "Tomorrow" or e.g. "Mon 9 Nov" (clinic time zone). */
-export function formatDayLabel(iso: string, now: Date) {
+export function formatDayLabel(iso: string, now: Date, locale: Locale = "en") {
   const day = dayKey(new Date(iso));
-  if (day === dayKey(now)) return "Today";
-  if (day === dayKey(new Date(now.getTime() + 86_400_000))) return "Tomorrow";
-  return new Intl.DateTimeFormat("en-GB", {
+  if (day === dayKey(now)) return locale === "uk" ? "Сьогодні" : "Today";
+  if (day === dayKey(new Date(now.getTime() + 86_400_000))) return locale === "uk" ? "Завтра" : "Tomorrow";
+  return cap(new Intl.DateTimeFormat(intlLocale(locale), {
     weekday: "short",
     day: "numeric",
     month: "short",
     timeZone: "Europe/Kyiv",
-  }).format(new Date(iso));
+  }).format(new Date(iso)));
 }
 
 /** Current time; kept out of components so render stays pure for the linter. */
@@ -81,9 +86,11 @@ export function isoWeekday(day: string) {
 }
 
 /** "YYYY-MM-DD" → "Wed 11 Nov". */
-export function formatDay(day: string) {
-  return new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).format(
-    new Date(`${day}T12:00:00Z`),
+export function formatDay(day: string, locale: Locale = "en") {
+  return cap(
+    new Intl.DateTimeFormat(intlLocale(locale), { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).format(
+      new Date(`${day}T12:00:00Z`),
+    ),
   );
 }
 
@@ -106,19 +113,20 @@ export function ageFrom(dob: string, now: Date) {
   return ty - y - (tm < m || (tm === m && td < d) ? 1 : 0);
 }
 
-/** "34 y · Female", "Male", "34 y" or null when nothing is known. */
-export function patientSummary(p: PatientDetails, now: Date) {
+/** "34 y · Female" / "34 р. · Жінка", or null when nothing is known. */
+export function patientSummary(p: PatientDetails, now: Date, locale: Locale = "en") {
   if (!p) return null;
+  const uk = locale === "uk";
   const parts = [
-    p.date_of_birth ? `${ageFrom(p.date_of_birth, now)} y` : null,
-    p.sex === "female" ? "Female" : p.sex === "male" ? "Male" : null,
+    p.date_of_birth ? `${ageFrom(p.date_of_birth, now)} ${uk ? "р." : "y"}` : null,
+    p.sex === "female" ? (uk ? "Жінка" : "Female") : p.sex === "male" ? (uk ? "Чоловік" : "Male") : null,
   ].filter(Boolean);
   return parts.length ? parts.join(" · ") : null;
 }
 
 /** "14 Mar 1990". */
-export function formatBirthDate(dob: string) {
-  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(
+export function formatBirthDate(dob: string, locale: Locale = "en") {
+  return new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(
     new Date(`${dob}T12:00:00Z`),
   );
 }
@@ -145,10 +153,10 @@ export function kyivDayOf(iso: string) {
 }
 
 /** "9 – 15 Nov 2026" / "30 Nov – 6 Dec 2026". */
-export function formatWeekRange(monday: string) {
+export function formatWeekRange(monday: string, locale: Locale = "en") {
   const sunday = addDays(monday, 6);
   const f = (day: string, opts: Intl.DateTimeFormatOptions) =>
-    new Intl.DateTimeFormat("en-GB", { ...opts, timeZone: "UTC" }).format(new Date(`${day}T12:00:00Z`));
+    new Intl.DateTimeFormat(intlLocale(locale), { ...opts, timeZone: "UTC" }).format(new Date(`${day}T12:00:00Z`));
   const sameMonth = monday.slice(0, 7) === sunday.slice(0, 7);
   return `${f(monday, sameMonth ? { day: "numeric" } : { day: "numeric", month: "short" })} – ${f(sunday, {
     day: "numeric",
@@ -157,9 +165,10 @@ export function formatWeekRange(monday: string) {
   })}`;
 }
 
-/** "12 Nov" for chart axes. */
-export function formatShortDate(day: string) {
-  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(
+/** "12 Nov" / "12 лист.", or "12.11" with `compact` for narrow chart axes. */
+export function formatShortDate(day: string, locale: Locale = "en", compact = false) {
+  const month = compact && locale === "uk" ? "2-digit" : "short";
+  return new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month, timeZone: "UTC" }).format(
     new Date(`${day}T12:00:00Z`),
   );
 }

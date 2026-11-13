@@ -4,6 +4,7 @@ import { useActionState, useState, type ReactNode } from "react";
 import { SubmitButton } from "@/components/buttons";
 import { buttonClass } from "@/components/button-styles";
 import type { Note } from "@/lib/ai/note";
+import { useT } from "@/lib/i18n/client";
 import { saveNote, type SaveState } from "./actions";
 
 type Props = {
@@ -17,6 +18,8 @@ type Props = {
 const area = "w-full rounded-xl border border-line bg-white px-4 py-3 text-ink outline-none focus:border-brand";
 
 export function NoteCard({ appointmentId, note, badge, editedAt, canEdit }: Props) {
+  const { t } = useT();
+  const d = t.doctor;
   const [editing, setEditing] = useState(false);
   const [state, action] = useActionState<SaveState, FormData>(async (prev, formData) => {
     const result = await saveNote(appointmentId, prev, formData);
@@ -27,16 +30,16 @@ export function NoteCard({ appointmentId, note, badge, editedAt, canEdit }: Prop
   return (
     <div className="rounded-2xl border border-line bg-white p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xl font-bold text-ink">Pre-visit note</h2>
+        <h2 className="text-xl font-bold text-ink">{d.note}</h2>
         <div className="flex flex-wrap items-center gap-2">
           {editedAt ? (
-            <span className="rounded-full bg-soft px-3 py-1 text-xs font-medium text-brand-dark">Reviewed &amp; edited by doctor</span>
+            <span className="rounded-full bg-soft px-3 py-1 text-xs font-medium text-brand-dark">{d.reviewed}</span>
           ) : (
             badge
           )}
           {canEdit && !editing && (
             <button type="button" onClick={() => setEditing(true)} className={buttonClass("ghost", "sm")}>
-              Edit
+              {t.common.edit}
             </button>
           )}
         </div>
@@ -44,29 +47,29 @@ export function NoteCard({ appointmentId, note, badge, editedAt, canEdit }: Prop
 
       {editing ? (
         <form action={action} className="mt-5 grid gap-4">
-          <EditField label="Chief complaint">
+          <EditField label={d.chiefComplaint}>
             <textarea name="chief_complaint" defaultValue={note.chief_complaint} rows={2} className={area} />
           </EditField>
-          <EditField label="History">
+          <EditField label={d.history}>
             <textarea name="history" defaultValue={note.history} rows={4} className={area} />
           </EditField>
           {(
             [
-              ["red_flags", "Needs attention"],
-              ["medications", "Medications"],
-              ["allergies", "Allergies"],
-              ["questions_for_doctor", "Worth asking"],
+              ["red_flags", d.needsAttention],
+              ["medications", d.medications],
+              ["allergies", d.allergies],
+              ["questions_for_doctor", d.worthAsking],
             ] as const
           ).map(([key, label]) => (
-            <EditField key={key} label={label} hint="One per line">
+            <EditField key={key} label={label} hint={d.onePerLine}>
               <textarea name={key} defaultValue={note[key].join("\n")} rows={3} className={area} />
             </EditField>
           ))}
           {state.error && <p className="text-sm text-red-600">{state.error}</p>}
           <div className="flex gap-2">
-            <SubmitButton pendingText="Saving…">Save note</SubmitButton>
+            <SubmitButton pendingText={t.common.saving}>{d.saveNote}</SubmitButton>
             <button type="button" onClick={() => setEditing(false)} className={buttonClass("ghost")}>
-              Cancel
+              {t.common.cancel}
             </button>
           </div>
         </form>
@@ -74,7 +77,7 @@ export function NoteCard({ appointmentId, note, badge, editedAt, canEdit }: Prop
         <>
           {note.red_flags.length > 0 && (
             <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4">
-              <p className="text-sm font-semibold text-red-800">Needs attention</p>
+              <p className="text-sm font-semibold text-red-800">{d.needsAttention}</p>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-red-900">
                 {note.red_flags.map((f) => (
                   <li key={f}>{f}</li>
@@ -83,20 +86,20 @@ export function NoteCard({ appointmentId, note, badge, editedAt, canEdit }: Prop
             </div>
           )}
           <dl className="mt-5 grid gap-5">
-            <Field label="Chief complaint">{note.chief_complaint}</Field>
-            <Field label="History">{note.history}</Field>
-            <Field label="Medications">
-              <List items={note.medications} empty="None reported" />
+            <Field label={d.chiefComplaint}>{note.chief_complaint}</Field>
+            <Field label={d.history}>{note.history}</Field>
+            <Field label={d.medications}>
+              <List items={note.medications} empty={t.common.noneReported} />
             </Field>
-            <Field label="Allergies">
-              <List items={note.allergies} empty="None reported" />
+            <Field label={d.allergies}>
+              <List items={note.allergies} empty={t.common.noneReported} />
             </Field>
-            <Field label="Worth asking">
+            <Field label={d.worthAsking}>
               <List items={note.questions_for_doctor} empty="—" />
             </Field>
           </dl>
           <p className="mt-6 border-t border-line pt-4 text-xs text-muted">
-            Organizes what the patient reported. Not a diagnosis; verify during the visit.
+            {d.disclaimer}
           </p>
         </>
       )}

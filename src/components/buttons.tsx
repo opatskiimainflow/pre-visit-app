@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
+import { useT } from "@/lib/i18n/client";
 import { buttonClass, type Variant } from "./button-styles";
 
 /** Submit button that shows a spinner while its form's server action runs. */
@@ -33,7 +34,8 @@ export function SubmitButton({
  * Two-step destructive button: first click asks "Sure?", second click submits.
  * Avoids native confirm() dialogs.
  */
-export function ConfirmSubmit({ children, confirmText = "Click again to confirm" }: { children: ReactNode; confirmText?: string }) {
+export function ConfirmSubmit({ children, confirmText }: { children: ReactNode; confirmText?: string }) {
+  const { t } = useT();
   const [armed, setArmed] = useState(false);
   const { pending } = useFormStatus();
 
@@ -47,10 +49,10 @@ export function ConfirmSubmit({ children, confirmText = "Click again to confirm"
   return (
     <span className="inline-flex items-center gap-2">
       <button type="submit" disabled={pending} className={`${buttonClass("danger", "sm")} border-red-400 bg-red-50`}>
-        {pending ? "…" : confirmText}
+        {pending ? "…" : (confirmText ?? t.common.confirmAgain)}
       </button>
       <button type="button" onClick={() => setArmed(false)} className="text-sm text-muted hover:text-ink">
-        Cancel
+        {t.common.cancel}
       </button>
     </span>
   );

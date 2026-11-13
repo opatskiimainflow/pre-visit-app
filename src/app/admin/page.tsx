@@ -9,8 +9,12 @@ import { AdminTabs } from "./admin-tabs";
 import { buttonClass } from "@/components/button-styles";
 import { BookForm } from "./book-form";
 import { cancelAppointment } from "./actions";
+import { getT } from "@/lib/i18n/server";
 
-export const metadata: Metadata = { title: "Appointments — PreVisit" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return { title: t.admin.apptsTitle };
+}
 
 type Row = {
   id: string;
@@ -45,36 +49,38 @@ export default async function AdminPage() {
   const patients = (people ?? []).filter((p) => p.role === "patient");
   const doctors = (people ?? []).filter((p) => p.role === "doctor" && p.active);
   const now = nowDate();
+  const { locale, t } = await getT();
+  const a_ = t.admin;
 
   return (
-    <PageShell profile={profile} title="Clinic appointments" subtitle={clinic?.name ?? "Your clinic"}>
+    <PageShell profile={profile} title={a_.apptsHeading} subtitle={clinic?.name ?? a_.yourClinic}>
       <AdminTabs active="/admin" />
       <div className="-mt-4 mb-4 flex justify-end">
         <a href="/admin/export/visits" download className={buttonClass("ghost", "sm")}>
-          Export all visits (CSV)
+          {a_.exportVisits}
         </a>
       </div>
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <section className="grid content-start gap-3">
           {rows.length === 0 ? (
-            <Empty>No upcoming visits. Book one on the right.</Empty>
+            <Empty>{a_.noUpcoming}</Empty>
           ) : (
             rows.map((a) => (
               <div key={a.id} className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line bg-white p-5">
                 <div className="flex items-center gap-4">
                   <span className="min-w-20 rounded-xl bg-soft px-3 py-1.5 text-center">
-                    <span className="block font-semibold text-ink">{formatTime(a.scheduled_at)}</span>
-                    <span className="block text-xs text-muted">{formatDayLabel(a.scheduled_at, now)}</span>
+                    <span className="block font-semibold text-ink">{formatTime(a.scheduled_at, locale)}</span>
+                    <span className="block text-xs text-muted">{formatDayLabel(a.scheduled_at, now, locale)}</span>
                   </span>
                   <div>
                     <p className="font-semibold text-ink">
-                      {a.patient?.full_name ?? "Patient"}
-                      {patientSummary(a.patient, now) && (
-                        <span className="ml-2 text-sm font-normal text-muted">{patientSummary(a.patient, now)}</span>
+                      {a.patient?.full_name ?? t.common.patient}
+                      {patientSummary(a.patient, now, locale) && (
+                        <span className="ml-2 text-sm font-normal text-muted">{patientSummary(a.patient, now, locale)}</span>
                       )}
                     </p>
                     <p className="text-sm text-muted">
-                      {a.doctor?.full_name ?? "Doctor"}
+                      {a.doctor?.full_name ?? t.common.doctor}
                       {a.reason ? ` · ${a.reason}` : ""}
                     </p>
                   </div>
@@ -83,7 +89,7 @@ export default async function AdminPage() {
                   <StatusChip visit={a} />
                   {a.status === "scheduled" && (
                     <form action={cancelAppointment.bind(null, a.id)}>
-                      <ConfirmSubmit confirmText="Cancel visit">Cancel</ConfirmSubmit>
+                      <ConfirmSubmit confirmText={a_.cancelVisit}>{t.common.cancel}</ConfirmSubmit>
                     </form>
                   )}
                 </div>

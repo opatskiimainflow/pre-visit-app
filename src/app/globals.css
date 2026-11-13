@@ -8,7 +8,7 @@
   --color-muted: #4a5f6b;
   --color-line: #e3ecee;
   --color-soft: #f3f8f8;
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), var(--font-inter-cyrillic), ui-sans-serif, system-ui, sans-serif;
 }
 
 body {

@@ -15,8 +15,12 @@ import { Card, PageShell } from "@/components/page-shell";
 import { ColumnChart, MeterList, StatTile, type Column } from "@/components/charts";
 import { AdminTabs } from "../admin-tabs";
 import { Stars } from "@/components/stars";
+import { getT } from "@/lib/i18n/server";
 
-export const metadata: Metadata = { title: "Analytics — PreVisit" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return { title: t.admin.analyticsTitle };
+}
 
 type Visit = { id: string; scheduled_at: string; status: string; doctor_id: string; intake: { id: string } | null };
 type Doctor = { id: string; full_name: string; specialty: string | null };
@@ -36,6 +40,8 @@ export default async function AnalyticsPage() {
   const profile = await requireRole("admin");
   const supabase = await createClient();
 
+  const { locale, t } = await getT();
+  const A = t.admin.analytics;
   const now = nowDate();
   const today = kyivToday(now);
   const thisMonday = weekStart(today);
@@ -73,18 +79,18 @@ export default async function AnalyticsPage() {
     const past = inWeek.filter((v) => new Date(v.scheduled_at) <= now);
     return { monday, total: inWeek.length, past: past.length, withAnswers: past.filter((v) => v.intake).length };
   });
-  const label = (m: string) => (m === thisMonday ? "This wk" : formatShortDate(m));
+  const label = (m: string) => (m === thisMonday ? A.thisWk : formatShortDate(m, locale, true));
   const visitColumns: Column[] = perWeek.map((w) => ({
     key: w.monday,
     label: label(w.monday),
     value: w.total,
-    note: w.monday === thisMonday ? "incl. booked" : undefined,
+    note: w.monday === thisMonday ? A.inclBooked : undefined,
   }));
   const completionColumns: Column[] = perWeek.map((w) => ({
     key: w.monday,
     label: label(w.monday),
     value: pct(w.withAnswers, w.past),
-    note: `${w.withAnswers} of ${w.past}`,
+    note: A.nOfM(w.withAnswers, w.past),
   }));
 
   // ── Headline numbers ──
@@ -110,7 +116,7 @@ export default async function AnalyticsPage() {
     return {
       key: d.id,
       name: d.full_name,
-      sub: d.specialty ?? "General practice",
+      sub: d.specialty ?? A.generalPractice,
       value: upcoming.filter((v) => v.doctor_id === d.id).length,
       total: capacity,
     };
@@ -132,38 +138,38 @@ export default async function AnalyticsPage() {
   const comments = ratings.filter((r) => r.comment).slice(0, 4);
 
   return (
-    <PageShell profile={profile} title="Analytics" subtitle={clinic?.name ?? "Your clinic"}>
+    <PageShell profile={profile} title={A.heading} subtitle={clinic?.name ?? t.admin.yourClinic}>
       <AdminTabs active="/admin/analytics" />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile
-          label="Visits this week"
+          label={A.visitsThisWeek}
           value={String(thisWeek)}
-          sub={`${delta >= 0 ? "+" : "−"}${Math.abs(delta)} vs last week (${lastWeek})`}
+          sub={A.vsLastWeek(delta >= 0 ? "+" : "−", Math.abs(delta), lastWeek)}
         />
-        <StatTile label="Average per week" value={String(avg)} sub="over the last 8 weeks" />
-        <StatTile label="Questionnaires filled in" value={`${completion30}%`} sub="of visits in the last 30 days" />
-        <StatTile label="Booked, next 7 days" value={String(upcoming.length)} sub={`${formatShortDate(loadFrom)} – ${formatShortDate(addDays(loadTo, -1))}`} />
+        <StatTile label={A.avgPerWeek} value={String(avg)} sub={A.over8} />
+        <StatTile label={A.filledIn} value={`${completion30}%`} sub={A.last30} />
+        <StatTile label={A.next7} value={String(upcoming.length)} sub={`${formatShortDate(loadFrom, locale)} – ${formatShortDate(addDays(loadTo, -1), locale)}`} />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
         <Card>
-          <h2 className="font-bold text-ink">Visits per week</h2>
-          <p className="mb-6 text-sm text-muted">All visits by week; this week includes booked ones.</p>
+          <h2 className="font-bold text-ink">{A.perWeek}</h2>
+          <p className="mb-6 text-sm text-muted">{A.perWeekSub}</p>
           <ColumnChart
             columns={visitColumns}
-            caption="Visits per week for the last nine weeks"
+            caption={A.perWeekCaption}
             emphasize={[weeks[weeks.length - 1], weeks[weeks.length - 2]]}
           />
         </Card>
         <Card>
-          <h2 className="font-bold text-ink">Questionnaire completion</h2>
-          <p className="mb-6 text-sm text-muted">Share of visits that had answers before the appointment.</p>
+          <h2 className="font-bold text-ink">{A.completion}</h2>
+          <p className="mb-6 text-sm text-muted">{A.completionSub}</p>
           <ColumnChart
             columns={completionColumns}
             max={100}
             format={(n) => `${n}%`}
-            caption="Share of visits with a filled-in questionnaire, per week"
+            caption={A.completionCaption}
             emphasize={[weeks[weeks.length - 2]]}
           />
         </Card>
@@ -171,26 +177,26 @@ export default async function AnalyticsPage() {
 
       <div className="mt-6">
         <Card>
-          <h2 className="font-bold text-ink">Doctor load, next 7 days</h2>
-          <p className="mb-6 text-sm text-muted">Booked visits out of the free slots in each doctor&apos;s working hours.</p>
-          {load.length === 0 ? <p className="text-muted">No active doctors.</p> : <MeterList rows={load} />}
+          <h2 className="font-bold text-ink">{A.load}</h2>
+          <p className="mb-6 text-sm text-muted">{A.loadSub}</p>
+          {load.length === 0 ? <p className="text-muted">{A.noDoctors}</p> : <MeterList rows={load} />}
         </Card>
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
         <Card>
-          <h2 className="font-bold text-ink">Patient rating</h2>
-          <p className="mb-5 text-sm text-muted">Stars patients gave after a completed visit.</p>
+          <h2 className="font-bold text-ink">{A.rating}</h2>
+          <p className="mb-5 text-sm text-muted">{A.ratingSub}</p>
           {ratings.length === 0 ? (
-            <p className="text-muted">No ratings yet.</p>
+            <p className="text-muted">{A.noRatings}</p>
           ) : (
             <div className="grid gap-6 sm:grid-cols-[auto_1fr] sm:items-center">
               <div>
                 <p className="text-4xl font-bold tracking-tight text-ink">{avgRating.toFixed(1)}</p>
-                <Stars value={Math.round(avgRating)} />
-                <p className="text-sm text-muted">{ratings.length} ratings</p>
+                <Stars value={Math.round(avgRating)} label={t.common.starsOutOf(Math.round(avgRating))} />
+                <p className="text-sm text-muted">{t.common.ratings(ratings.length)}</p>
               </div>
-              <ul className="grid gap-1.5" aria-label="Ratings by number of stars">
+              <ul className="grid gap-1.5" aria-label={A.byStars}>
                 {distribution.map((d) => (
                   <li key={d.n} className="grid grid-cols-[2.5rem_1fr_2rem] items-center gap-2 text-sm">
                     <span className="text-muted">{d.n} ★</span>
@@ -212,7 +218,7 @@ export default async function AnalyticsPage() {
                 <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
                   <span className="font-semibold text-ink">{d.name}</span>
                   <span className="text-muted">
-                    <span className="font-semibold text-ink">{d.avg.toFixed(1)}</span> ★ · {d.count} ratings
+                    <span className="font-semibold text-ink">{d.avg.toFixed(1)}</span> ★ · {t.common.ratings(d.count)}
                   </span>
                 </li>
               ))}
@@ -220,18 +226,18 @@ export default async function AnalyticsPage() {
           )}
         </Card>
         <Card>
-          <h2 className="font-bold text-ink">Latest comments</h2>
-          <p className="mb-5 text-sm text-muted">What patients wrote with their rating.</p>
+          <h2 className="font-bold text-ink">{A.comments}</h2>
+          <p className="mb-5 text-sm text-muted">{A.commentsSub}</p>
           {comments.length === 0 ? (
-            <p className="text-muted">No comments yet.</p>
+            <p className="text-muted">{A.noComments}</p>
           ) : (
             <ul className="grid gap-4">
               {comments.map((c, i) => (
                 <li key={i} className="border-l-2 border-brand/40 pl-3">
-                  <Stars value={c.stars} size="text-sm" />
+                  <Stars value={c.stars} size="text-sm" label={t.common.starsOutOf(c.stars)} />
                   <p className="text-ink">“{c.comment}”</p>
                   <p className="text-xs text-muted">
-                    {c.appointment?.patient?.full_name ?? "Patient"} · {formatShortDate(kyivDayOf(c.created_at))}
+                    {c.appointment?.patient?.full_name ?? t.common.patient} · {formatShortDate(kyivDayOf(c.created_at), locale)}
                   </p>
                 </li>
               ))}

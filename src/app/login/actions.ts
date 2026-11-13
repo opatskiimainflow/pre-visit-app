@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ROLE_HOME, type Role } from "@/lib/auth";
+import { getT } from "@/lib/i18n/server";
 
 export type LoginState = { error?: string };
 
@@ -13,10 +14,11 @@ const DEMO_EMAILS: Record<Role, string> = {
 };
 
 async function signInAndRedirect(email: string, password: string): Promise<LoginState> {
+  const { t } = await getT();
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error || !data.user) {
-    return { error: "Wrong email or password." };
+    return { error: t.auth.errWrongCredentials };
   }
 
   const { data: profile } = await supabase
@@ -27,7 +29,7 @@ async function signInAndRedirect(email: string, password: string): Promise<Login
 
   if (!profile) {
     await supabase.auth.signOut();
-    return { error: "This account has no PreVisit profile yet. Run supabase/seed.sql." };
+    return { error: t.auth.errNoProfile };
   }
 
   redirect(ROLE_HOME[profile.role as Role]);
@@ -36,7 +38,7 @@ async function signInAndRedirect(email: string, password: string): Promise<Login
 export async function signIn(_prev: LoginState, formData: FormData): Promise<LoginState> {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  if (!email || !password) return { error: "Enter your email and password." };
+  if (!email || !password) return { error: (await getT()).t.auth.errEnterBoth };
   return signInAndRedirect(email, password);
 }
 
@@ -44,7 +46,7 @@ export async function signInDemo(_prev: LoginState, formData: FormData): Promise
   const role = formData.get("role") as Role;
   const password = process.env.DEMO_PASSWORD;
   if (!DEMO_EMAILS[role] || !password) {
-    return { error: "Demo login is not configured (DEMO_PASSWORD is missing)." };
+    return { error: (await getT()).t.auth.errDemoNotConfigured };
   }
   return signInAndRedirect(DEMO_EMAILS[role], password);
 }

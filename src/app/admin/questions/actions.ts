@@ -3,29 +3,34 @@
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { getT } from "@/lib/i18n/server";
+import { dbMessage } from "@/lib/i18n/messages/db";
+import type { Messages } from "@/lib/i18n/messages";
+import type { Locale } from "@/lib/i18n/config";
 
 export type FormState = { error?: string; ok?: boolean };
 
 const KINDS = ["short", "long", "yes_no"] as const;
 const PREFILL = ["allergies", "medications", "conditions"];
 
-function readQuestion(formData: FormData) {
+function readQuestion(formData: FormData, e: Messages["admin"]["questionErrors"]) {
   const text = String(formData.get("text") ?? "").trim();
+  const text_uk = String(formData.get("text_uk") ?? "").trim() || null;
   const kind = String(formData.get("kind") ?? "short");
   const required = formData.get("required") === "on";
-  if (text.length < 3) return { error: "Write the question (at least 3 characters)." } as const;
-  if (text.length > 300) return { error: "Keep the question under 300 characters." } as const;
-  if (!KINDS.includes(kind as (typeof KINDS)[number])) return { error: "Unknown answer type." } as const;
+  if (text.length < 3) return { error: e.short } as const;
+  if (text.length > 300 || (text_uk?.length ?? 0) > 300) return { error: e.long } as const;
+  if (!KINDS.includes(kind as (typeof KINDS)[number])) return { error: e.kind } as const;
   // Empty = a regular question. The database checks the parent is a yes/no question of this clinic.
   const parent_id = String(formData.get("parent_id") ?? "") || null;
   const prefillRaw = String(formData.get("prefill") ?? "");
   const prefill = PREFILL.includes(prefillRaw) ? prefillRaw : null;
-  return { text, kind, required, parent_id, prefill } as const;
+  return { text, text_uk, kind, required, parent_id, prefill } as const;
 }
 
 /** P0001 messages come from the database check on follow-ups and are safe to show. */
-function failure(error: { code?: string; message: string }, fallback: string) {
-  return { error: error.code === "P0001" ? `${error.message}.` : fallback };
+function failure(error: { code?: string; message: string }, fallback: string, locale: Locale) {
+  return { error: error.code === "P0001" ? dbMessage(error.message, locale) : fallback };
 }
 
 function done() {
@@ -35,7 +40,9 @@ function done() {
 
 export async function addQuestion(_prev: FormState, formData: FormData): Promise<FormState> {
   const profile = await requireRole("admin");
-  const q = readQuestion(formData);
+  const { locale, t } = await getT();
+  const e = t.admin.questionErrors;
+  const q = readQuestion(formData, e);
   if ("error" in q) return { error: q.error };
 
   const supabase = await createClient();
@@ -50,17 +57,19 @@ export async function addQuestion(_prev: FormState, formData: FormData): Promise
   const { error } = await supabase
     .from("questions")
     .insert({ ...q, clinic_id: profile.clinic_id, position: (last?.position ?? 0) + 1 });
-  return error ? failure(error, "Could not add the question.") : done();
+  return error ? failure(error, e.addFailed, locale) : done();
 }
 
 export async function updateQuestion(id: string, _prev: FormState, formData: FormData): Promise<FormState> {
   await requireRole("admin");
-  const q = readQuestion(formData);
+  const { locale, t } = await getT();
+  const e = t.admin.questionErrors;
+  const q = readQuestion(formData, e);
   if ("error" in q) return { error: q.error };
 
   const supabase = await createClient();
   const { error } = await supabase.from("questions").update(q).eq("id", id);
-  return error ? failure(error, "Could not save the question.") : done();
+  return error ? failure(error, e.saveFailed, locale) : done();
 }
 
 export async function deleteQuestion(id: string): Promise<void> {

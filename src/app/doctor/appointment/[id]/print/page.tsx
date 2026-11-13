@@ -6,9 +6,13 @@ import { createClient } from "@/lib/supabase/server";
 import { formatBirthDate, formatDateTime, nowDate, patientSummary } from "@/lib/format";
 import { CARD_FIELDS, type MedicalCard } from "@/lib/medical-card";
 import type { Answer, Note } from "@/lib/ai/note";
+import { getT } from "@/lib/i18n/server";
 import { PrintButton } from "./print-button";
 
-export const metadata: Metadata = { title: "Pre-visit note — PreVisit" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return { title: t.doctor.printTitle };
+}
 
 type Appt = {
   id: string;
@@ -50,25 +54,27 @@ export default async function PrintNotePage({ params }: PageProps<"/doctor/appoi
   const card = cardRow as MedicalCard | null;
   const note = appt.note?.content;
   const now = nowDate();
+  const { locale, t } = await getT();
+  const d = t.doctor;
 
   return (
     <div className="flex-1 bg-white">
       <main className="mx-auto max-w-3xl px-6 py-10 text-ink print:max-w-none print:p-0 print:text-[11pt]">
         <div className="mb-8 flex items-start justify-between gap-4 border-b-2 border-ink pb-4">
           <div>
-            <p className="text-sm text-muted">{appt.clinic?.name ?? "Clinic"} · Pre-visit note</p>
-            <h1 className="text-2xl font-bold">{appt.patient?.full_name ?? "Patient"}</h1>
+            <p className="text-sm text-muted">{appt.clinic?.name ?? t.common.clinic} · {d.printSub}</p>
+            <h1 className="text-2xl font-bold">{appt.patient?.full_name ?? t.common.patient}</h1>
             <p className="text-sm">
               {[
-                appt.patient?.date_of_birth ? `Born ${formatBirthDate(appt.patient.date_of_birth)}` : null,
-                patientSummary(appt.patient, now),
+                appt.patient?.date_of_birth ? d.born(formatBirthDate(appt.patient.date_of_birth, locale)) : null,
+                patientSummary(appt.patient, now, locale),
               ]
                 .filter(Boolean)
-                .join(" · ") || "Date of birth and sex not given"}
+                .join(" · ") || d.noDobSex}
             </p>
           </div>
           <div className="text-right text-sm">
-            <p className="font-semibold">{formatDateTime(appt.scheduled_at)}</p>
+            <p className="font-semibold">{formatDateTime(appt.scheduled_at, locale)}</p>
             <p>{appt.doctor?.full_name}</p>
             {appt.doctor?.specialty && <p className="text-muted">{appt.doctor.specialty}</p>}
             <div className="mt-3">
@@ -77,12 +83,12 @@ export default async function PrintNotePage({ params }: PageProps<"/doctor/appoi
           </div>
         </div>
 
-        {appt.reason && <Section title="Reason for booking">{appt.reason}</Section>}
+        {appt.reason && <Section title={d.reasonForBooking}>{appt.reason}</Section>}
 
         {note ? (
           <>
             {note.red_flags.length > 0 && (
-              <Section title="Needs attention">
+              <Section title={d.needsAttention}>
                 <ul className="list-disc pl-5 font-semibold">
                   {note.red_flags.map((f) => (
                     <li key={f}>{f}</li>
@@ -90,30 +96,30 @@ export default async function PrintNotePage({ params }: PageProps<"/doctor/appoi
                 </ul>
               </Section>
             )}
-            <Section title="Chief complaint">{note.chief_complaint}</Section>
-            <Section title="History">{note.history}</Section>
+            <Section title={d.chiefComplaint}>{note.chief_complaint}</Section>
+            <Section title={d.history}>{note.history}</Section>
             <div className="grid grid-cols-2 gap-6">
-              <Section title="Medications">
-                <Items items={note.medications} />
+              <Section title={d.medications}>
+                <Items items={note.medications} empty={t.common.noneReported} />
               </Section>
-              <Section title="Allergies">
-                <Items items={note.allergies} />
+              <Section title={d.allergies}>
+                <Items items={note.allergies} empty={t.common.noneReported} />
               </Section>
             </div>
-            <Section title="Worth asking">
-              <Items items={note.questions_for_doctor} />
+            <Section title={d.worthAsking}>
+              <Items items={note.questions_for_doctor} empty={t.common.noneReported} />
             </Section>
           </>
         ) : (
-          <Section title="Pre-visit note">No note yet — the patient hasn&apos;t sent answers.</Section>
+          <Section title={d.note}>{d.noNotePrint}</Section>
         )}
 
         {card && CARD_FIELDS.some((f) => card[f.key]) && (
-          <Section title="Medical card (kept by the patient)">
+          <Section title={d.cardByPatient}>
             <dl className="grid grid-cols-3 gap-4">
               {CARD_FIELDS.map((f) => (
                 <div key={f.key}>
-                  <dt className="text-xs text-muted">{f.label}</dt>
+                  <dt className="text-xs text-muted">{t.patient.cardFields[f.key].label}</dt>
                   <dd>{card[f.key] || "—"}</dd>
                 </div>
               ))}
@@ -122,7 +128,7 @@ export default async function PrintNotePage({ params }: PageProps<"/doctor/appoi
         )}
 
         {appt.intake && (
-          <Section title="Patient's answers">
+          <Section title={d.answers}>
             <ol className="grid gap-2">
               {appt.intake.answers.map((a, i) => (
                 <li key={i} className="break-inside-avoid">
@@ -134,12 +140,11 @@ export default async function PrintNotePage({ params }: PageProps<"/doctor/appoi
           </Section>
         )}
 
-        {appt.summary && <Section title="Summary given to the patient"><p className="whitespace-pre-line">{appt.summary.body}</p></Section>}
-        {appt.doctor_note?.body && <Section title="Doctor's notes"><p className="whitespace-pre-line">{appt.doctor_note.body}</p></Section>}
+        {appt.summary && <Section title={d.summaryGiven}><p className="whitespace-pre-line">{appt.summary.body}</p></Section>}
+        {appt.doctor_note?.body && <Section title={d.doctorNotes}><p className="whitespace-pre-line">{appt.doctor_note.body}</p></Section>}
 
         <p className="mt-10 border-t border-line pt-3 text-xs text-muted">
-          Printed {formatDateTime(now.toISOString())} from PreVisit. The note organizes what the patient reported; it is
-          not a diagnosis. PreVisit is a portfolio demo.
+          {d.printed(formatDateTime(now.toISOString(), locale))}
         </p>
       </main>
     </div>
@@ -155,8 +160,8 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function Items({ items }: { items: string[] }) {
-  if (!items.length) return <span className="text-muted">None reported</span>;
+function Items({ items, empty }: { items: string[]; empty: string }) {
+  if (!items.length) return <span className="text-muted">{empty}</span>;
   return (
     <ul className="list-disc pl-5">
       {items.map((x) => (

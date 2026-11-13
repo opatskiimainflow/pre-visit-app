@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getT } from "@/lib/i18n/server";
 
 export type SignupState = { error?: string; email?: string; fullName?: string };
 
@@ -12,10 +13,11 @@ export async function signUp(_prev: SignupState, formData: FormData): Promise<Si
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   const keep = { email, fullName };
+  const { t } = await getT();
 
-  if (fullName.length < 2 || fullName.length > 80) return { ...keep, error: "Enter your full name." };
-  if (!EMAIL.test(email)) return { ...keep, error: "Enter a valid email address." };
-  if (password.length < 8) return { ...keep, error: "Use at least 8 characters for the password." };
+  if (fullName.length < 2 || fullName.length > 80) return { ...keep, error: t.auth.errFullName };
+  if (!EMAIL.test(email)) return { ...keep, error: t.auth.errEmail };
+  if (password.length < 8) return { ...keep, error: t.auth.errPasswordShort };
 
   const supabase = await createClient();
   // The database trigger (migrations/006) turns this into a patient of the demo clinic.
@@ -30,27 +32,27 @@ export async function signUp(_prev: SignupState, formData: FormData): Promise<Si
     switch (error.code) {
       case "user_already_exists":
       case "email_exists":
-        return { ...keep, error: "An account with this email already exists. Sign in instead." };
+        return { ...keep, error: t.auth.errExists };
       case "weak_password":
-        return { ...keep, error: "This password is too weak. Try a longer one." };
+        return { ...keep, error: t.auth.errWeak };
       case "over_request_rate_limit":
       case "over_email_send_rate_limit":
-        return { ...keep, error: "Too many sign-ups right now. Please try again in a few minutes." };
+        return { ...keep, error: t.auth.errRate };
       case "signup_disabled":
-        return { ...keep, error: "Sign-ups are closed at the moment. Use a demo role instead." };
+        return { ...keep, error: t.auth.errClosed };
       default:
-        return { ...keep, error: "Could not create the account. Please try again or use a demo role." };
+        return { ...keep, error: t.auth.errSignup };
     }
   }
 
   // Supabase returns a user without identities when the email is already taken
   // (it hides this on purpose); treat it the same as "already exists".
   if (data.user && data.user.identities?.length === 0) {
-    return { ...keep, error: "An account with this email already exists. Sign in instead." };
+    return { ...keep, error: t.auth.errExists };
   }
   if (!data.session) {
     // Only happens if "Confirm email" is switched back on in Supabase.
-    return { ...keep, error: "Check your inbox to confirm your email, then sign in." };
+    return { ...keep, error: t.auth.errConfirm };
   }
 
   redirect("/patient?welcome=1");

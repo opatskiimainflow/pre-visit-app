@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { kyivLocalToISO } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
 
 export type BookState = { error?: string; ok?: boolean };
 
@@ -12,11 +13,12 @@ export async function bookAppointment(_prev: BookState, formData: FormData): Pro
   const patientId = String(formData.get("patient_id") ?? "");
   const doctorId = String(formData.get("doctor_id") ?? "");
   const reason = String(formData.get("reason") ?? "").trim().slice(0, 200) || null;
+  const e = (await getT()).t.admin.bookErrors;
   const scheduledAt = kyivLocalToISO(String(formData.get("date") ?? ""), String(formData.get("time") ?? ""));
 
-  if (!patientId || !doctorId) return { error: "Choose a patient and a doctor." };
-  if (!scheduledAt) return { error: "Choose a valid date and time." };
-  if (new Date(scheduledAt).getTime() < Date.now() - 5 * 60_000) return { error: "That time is in the past." };
+  if (!patientId || !doctorId) return { error: e.people };
+  if (!scheduledAt) return { error: e.time };
+  if (new Date(scheduledAt).getTime() < Date.now() - 5 * 60_000) return { error: e.past };
 
   const supabase = await createClient();
   const day = String(formData.get("date") ?? "");
@@ -26,7 +28,7 @@ export async function bookAppointment(_prev: BookState, formData: FormData): Pro
     .eq("doctor_id", doctorId)
     .lte("start_date", day)
     .gte("end_date", day);
-  if (off) return { error: "The doctor is off that day (see the Doctors tab)." };
+  if (off) return { error: e.off };
 
   // RLS checks that both people belong to the admin's clinic.
   const { error } = await supabase.from("appointments").insert({
@@ -36,7 +38,7 @@ export async function bookAppointment(_prev: BookState, formData: FormData): Pro
     scheduled_at: scheduledAt,
     reason,
   });
-  if (error) return { error: "Could not book the visit." };
+  if (error) return { error: e.failed };
 
   revalidatePath("/admin");
   revalidatePath("/doctor");

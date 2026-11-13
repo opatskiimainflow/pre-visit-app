@@ -5,6 +5,8 @@
  * readout on every mark, and a table view so no value depends on hovering.
  */
 
+import { getT } from "@/lib/i18n/server";
+
 export type Column = { key: string; label: string; value: number; note?: string };
 
 function niceMax(v: number) {
@@ -14,7 +16,7 @@ function niceMax(v: number) {
   return Math.ceil(v / step) * step;
 }
 
-export function ColumnChart({
+export async function ColumnChart({
   columns,
   format = (n) => String(n),
   max,
@@ -30,6 +32,7 @@ export function ColumnChart({
   emphasize?: string[];
 }) {
   const top = max ?? niceMax(Math.max(...columns.map((c) => c.value), 0));
+  const c_ = (await getT()).t.admin.charts;
   const ticks = [0, 0.5, 1].map((f) => Math.round(top * f));
 
   return (
@@ -86,7 +89,7 @@ export function ColumnChart({
             {columns.map((c, i) => (
               <li
                 key={c.key}
-                className={`flex-1 truncate px-0.5 text-center ${(columns.length - 1 - i) % 2 ? "max-sm:invisible" : ""}`}
+                className={`min-w-0 flex-1 truncate px-0.5 text-center max-sm:overflow-visible ${(columns.length - 1 - i) % 2 ? "max-sm:invisible" : ""} ${i === columns.length - 1 ? "max-sm:flex max-sm:justify-end" : ""}`}
               >
                 {c.label}
               </li>
@@ -96,7 +99,8 @@ export function ColumnChart({
       </div>
       <figcaption className="sr-only">{caption}</figcaption>
       <DataTable
-        head={["Week", "Value"]}
+        head={[c_.week, c_.value]}
+        showData={c_.showData}
         rows={columns.map((c) => [`${c.label}${c.note ? ` (${c.note})` : ""}`, format(c.value)])}
       />
     </figure>
@@ -106,7 +110,8 @@ export function ColumnChart({
 export type Meter = { key: string; name: string; sub?: string; value: number; total: number };
 
 /** Name, bar and figure per row; each bar is the share of that row's own total. */
-export function MeterList({ rows }: { rows: Meter[] }) {
+export async function MeterList({ rows }: { rows: Meter[] }) {
+  const c_ = (await getT()).t.admin.charts;
   return (
     <figure>
       <ul className="grid gap-5">
@@ -124,12 +129,12 @@ export function MeterList({ rows }: { rows: Meter[] }) {
                 aria-valuemin={0}
                 aria-valuemax={r.total}
                 aria-valuenow={r.value}
-                aria-label={`${r.name}: ${r.value} of ${r.total} slots booked`}
+                aria-label={c_.slotsBooked(r.name, r.value, r.total)}
               >
                 <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%`, minWidth: r.value > 0 ? 6 : 0 }} />
               </div>
               <p className="text-sm whitespace-nowrap text-muted sm:text-right">
-                <span className="font-semibold text-ink">{pct}%</span> · {r.value} of {r.total} slots
+                <span className="font-semibold text-ink">{pct}%</span> · {c_.slots(r.value, r.total)}
               </p>
             </li>
           );
@@ -149,10 +154,10 @@ export function StatTile({ label, value, sub }: { label: string; value: string; 
   );
 }
 
-function DataTable({ head, rows }: { head: string[]; rows: string[][] }) {
+function DataTable({ head, rows, showData }: { head: string[]; rows: string[][]; showData: string }) {
   return (
     <details className="mt-4 text-sm">
-      <summary className="cursor-pointer text-muted hover:text-ink">Show data</summary>
+      <summary className="cursor-pointer text-muted hover:text-ink">{showData}</summary>
       <table className="mt-2 w-full max-w-sm text-left">
         <thead className="text-muted">
           <tr>

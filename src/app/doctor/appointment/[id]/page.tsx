@@ -20,8 +20,12 @@ import { compareNotes } from "@/lib/compare";
 import { CARD_FIELDS, type MedicalCard } from "@/lib/medical-card";
 import { buttonClass } from "@/components/button-styles";
 import { Stars } from "@/components/stars";
+import { getT } from "@/lib/i18n/server";
 
-export const metadata: Metadata = { title: "Visit — PreVisit" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return { title: t.doctor.visitTitle };
+}
 
 type Appt = {
   id: string;
@@ -93,6 +97,10 @@ export default async function AppointmentPage({ params }: PageProps<"/doctor/app
   const events = ((eventRows ?? []) as VisitEvent[]).filter((e) => new Date(e.created_at) <= nowDate());
   const history = (historyRows ?? []) as unknown as History[];
   const completed = appt.status === "completed";
+  const { locale, t } = await getT();
+  const d = t.doctor;
+  const now = nowDate();
+  const summary = patientSummary(appt.patient, now, locale);
   // Compare with the most recent earlier visit that has a note.
   const previous = ((prevRows ?? []) as unknown as History[])[0];
   const comparison = previous?.note && appt.note ? compareNotes(previous.note.content, appt.note.content) : null;
@@ -100,33 +108,33 @@ export default async function AppointmentPage({ params }: PageProps<"/doctor/app
   const badge =
     appt.note?.model === DEMO_MODEL || appt.note?.model === "demo-seed" ? (
       <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
-        Demo mode · rule-based, no AI
+        {d.demoBadge}
       </span>
     ) : (
-      <span className="text-xs text-muted">AI-prepared{appt.note?.model ? ` · ${appt.note.model}` : ""}</span>
+      <span className="text-xs text-muted">{d.aiPrepared}{appt.note?.model ? ` · ${appt.note.model}` : ""}</span>
     );
 
   return (
     <PageShell
       profile={profile}
-      title={appt.patient?.full_name ?? "Patient"}
-      subtitle={`${patientSummary(appt.patient, nowDate()) ? `${patientSummary(appt.patient, nowDate())} · ` : ""}${formatDayLabel(appt.scheduled_at, nowDate())}, ${formatTime(appt.scheduled_at)}${appt.reason ? ` · ${appt.reason}` : ""}`}
+      title={appt.patient?.full_name ?? t.common.patient}
+      subtitle={`${summary ? `${summary} · ` : ""}${formatDayLabel(appt.scheduled_at, now, locale)}, ${formatTime(appt.scheduled_at, locale)}${appt.reason ? ` · ${appt.reason}` : ""}`}
     >
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <Link href="/doctor" className="text-sm text-muted hover:text-brand">
-          ← All appointments
+          {d.allAppointments}
         </Link>
         <div className="flex flex-wrap items-center gap-3">
           <Link href={`/doctor/appointment/${appt.id}/print`} target="_blank" className={buttonClass("ghost", "sm")}>
-            Print / PDF
+            {d.print}
           </Link>
           <StatusChip visit={appt} />
           {completed && appt.completed_at && (
-            <span className="text-sm text-muted">{formatDateTime(appt.completed_at)}</span>
+            <span className="text-sm text-muted">{formatDateTime(appt.completed_at, locale)}</span>
           )}
           <form action={setVisitStatus.bind(null, appt.id, completed ? "scheduled" : "completed")}>
-            <SubmitButton size="sm" variant={completed ? "ghost" : "primary"} pendingText="Saving…">
-              {completed ? "Reopen visit" : "Mark visit as completed"}
+            <SubmitButton size="sm" variant={completed ? "ghost" : "primary"} pendingText={t.common.saving}>
+              {completed ? d.reopen : d.markCompleted}
             </SubmitButton>
           </form>
         </div>
@@ -144,14 +152,14 @@ export default async function AppointmentPage({ params }: PageProps<"/doctor/app
             />
           ) : appt.intake ? (
             <Card>
-              <h2 className="text-xl font-bold text-ink">No note yet</h2>
-              <p className="mt-1 mb-5 text-muted">The patient&apos;s answers are in. Prepare a note from them.</p>
+              <h2 className="text-xl font-bold text-ink">{d.noNoteYet}</h2>
+              <p className="mt-1 mb-5 text-muted">{d.answersIn}</p>
               <GenerateNoteButton appointmentId={appt.id} />
             </Card>
           ) : (
             <Card>
-              <h2 className="text-xl font-bold text-ink">Waiting for the patient</h2>
-              <p className="mt-1 text-muted">The questionnaire hasn&apos;t been filled in yet.</p>
+              <h2 className="text-xl font-bold text-ink">{d.waitingTitle}</h2>
+              <p className="mt-1 text-muted">{d.waitingText}</p>
             </Card>
           )}
           {comparison && previous && <ComparisonCard previous={previous} comparison={comparison} />}
@@ -162,41 +170,43 @@ export default async function AppointmentPage({ params }: PageProps<"/doctor/app
         <aside className="grid content-start gap-6">
           {appt.rating && (
             <Card>
-              <h2 className="font-bold text-ink">Patient&apos;s rating</h2>
-              <Stars value={appt.rating.stars} />
+              <h2 className="font-bold text-ink">{d.patientRating}</h2>
+              <Stars value={appt.rating.stars} label={t.common.starsOutOf(appt.rating.stars)} />
               {appt.rating.comment && <p className="mt-1 text-sm text-ink">“{appt.rating.comment}”</p>}
             </Card>
           )}
           <Card>
-            <h2 className="font-bold text-ink">Medical card</h2>
+            <h2 className="font-bold text-ink">{d.medicalCard}</h2>
             {card && CARD_FIELDS.some((f) => card[f.key]) ? (
               <dl className="mt-3 grid gap-3">
                 {CARD_FIELDS.map((f) => (
                   <div key={f.key}>
-                    <dt className="text-sm text-muted">{f.label}</dt>
+                    <dt className="text-sm text-muted">{t.patient.cardFields[f.key].label}</dt>
                     <dd className="text-ink">{card[f.key] || "—"}</dd>
                   </div>
                 ))}
               </dl>
             ) : (
-              <p className="mt-2 text-sm text-muted">The patient hasn&apos;t filled in their medical card.</p>
+              <p className="mt-2 text-sm text-muted">{d.noCard}</p>
             )}
           </Card>
           <Card>
-            <h2 className="font-bold text-ink">Previous visits</h2>
+            <h2 className="font-bold text-ink">{d.previousVisits}</h2>
             {history.length === 0 ? (
-              <p className="mt-2 text-sm text-muted">First visit with you.</p>
+              <p className="mt-2 text-sm text-muted">{d.firstVisit}</p>
             ) : (
               <ol className="mt-4 grid gap-3">
                 {history.map((h) => (
                   <li key={h.id}>
                     <Link href={`/doctor/appointment/${h.id}`} className="block rounded-xl bg-soft p-3 hover:ring-1 hover:ring-brand">
                       <p className="text-sm font-semibold text-ink">
-                        {formatDateTime(h.scheduled_at)}
-                        {h.status === "completed" && <span className="ml-2 text-xs font-normal text-muted">completed</span>}
+                        {formatDateTime(h.scheduled_at, locale)}
+                        {h.status === "completed" && (
+                          <span className="ml-2 text-xs font-normal text-muted">{d.completedLower}</span>
+                        )}
                       </p>
                       <p className="text-sm text-muted">
-                        {h.note?.content.chief_complaint ?? h.reason ?? "No note"}
+                        {h.note?.content.chief_complaint ?? h.reason ?? d.noNote}
                       </p>
                     </Link>
                   </li>
@@ -205,7 +215,7 @@ export default async function AppointmentPage({ params }: PageProps<"/doctor/app
             )}
           </Card>
           <Card>
-            <h2 className="font-bold text-ink">Patient&apos;s answers</h2>
+            <h2 className="font-bold text-ink">{d.answers}</h2>
             {appt.intake ? (
               <ol className="mt-4 grid gap-4">
                 {appt.intake.answers.map((a, i) => (
@@ -216,13 +226,13 @@ export default async function AppointmentPage({ params }: PageProps<"/doctor/app
                 ))}
               </ol>
             ) : (
-              <p className="mt-2 text-sm text-muted">No answers yet.</p>
+              <p className="mt-2 text-sm text-muted">{d.noAnswers}</p>
             )}
           </Card>
           <Card>
-            <h2 className="font-bold text-ink">Visit history</h2>
+            <h2 className="font-bold text-ink">{d.visitHistory}</h2>
             {events.length === 0 ? (
-              <p className="mt-2 text-sm text-muted">No changes recorded.</p>
+              <p className="mt-2 text-sm text-muted">{d.noChanges}</p>
             ) : (
               <ol className="mt-4 grid gap-3 border-l border-line pl-4">
                 {events.map((e) => (
@@ -232,9 +242,12 @@ export default async function AppointmentPage({ params }: PageProps<"/doctor/app
                       aria-hidden
                     />
                     <p className="text-sm text-ink">
-                      <span className="font-semibold">{e.actor_name}</span> {describeEvent(e, false)}
+                      <span className="font-semibold">
+                        {e.actor_name === "System" ? t.events.roles.system : e.actor_name}
+                      </span>{" "}
+                      {describeEvent(e, false, locale)}
                     </p>
-                    <p className="text-xs text-muted">{formatDateTime(e.created_at)}</p>
+                    <p className="text-xs text-muted">{formatDateTime(e.created_at, locale)}</p>
                   </li>
                 ))}
               </ol>

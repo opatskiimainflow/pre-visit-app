@@ -6,9 +6,13 @@ import { createClient } from "@/lib/supabase/server";
 import { formatDateTime } from "@/lib/format";
 import { PageShell } from "@/components/page-shell";
 import { QUESTION_SELECT, type MedicalCard, type Question } from "@/lib/medical-card";
+import { getT } from "@/lib/i18n/server";
 import { QuestionnaireForm } from "./questionnaire-form";
 
-export const metadata: Metadata = { title: "Questionnaire — PreVisit" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return { title: t.patient.questionnaireTitle };
+}
 
 type Appt = {
   id: string;
@@ -36,16 +40,17 @@ export default async function VisitPage({ params }: PageProps<"/patient/visit/[i
   const appt = data as unknown as Appt | null;
   if (!appt) notFound();
   if (appt.intake || appt.status === "completed") redirect("/patient");
+  const { locale, t } = await getT();
 
   return (
     <PageShell
       profile={profile}
-      title="Before your visit"
-      subtitle={`${formatDateTime(appt.scheduled_at)} · ${appt.doctor?.full_name ?? "Your doctor"}`}
+      title={t.patient.beforeVisit}
+      subtitle={`${formatDateTime(appt.scheduled_at, locale)} · ${appt.doctor?.full_name ?? t.patient.yourDoctor}`}
     >
       <div className="max-w-2xl">
         <Link href="/patient" className="mb-6 inline-block text-sm text-muted hover:text-brand">
-          ← Back to my visits
+          {t.patient.back}
         </Link>
         <QuestionnaireForm
           appointmentId={appt.id}

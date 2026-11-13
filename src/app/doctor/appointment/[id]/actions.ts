@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createNoteForAppointment } from "@/lib/notes";
+import { getT } from "@/lib/i18n/server";
 import { NoteSchema, type Answer } from "@/lib/ai/note";
 
 export type GenerateState = { error?: string };
@@ -27,9 +28,10 @@ export async function generateNoteAction(appointmentId: string): Promise<Generat
     .single();
 
   const appt = data as unknown as { reason: string | null; intake: { answers: Answer[] } | null } | null;
-  if (!appt?.intake) return { error: "The patient has not sent answers yet." };
+  const { locale, t } = await getT();
+  if (!appt?.intake) return { error: t.doctor.errNoAnswers };
 
-  const error = await createNoteForAppointment(supabase, appointmentId, appt.intake.answers, appt.reason);
+  const error = await createNoteForAppointment(supabase, appointmentId, appt.intake.answers, appt.reason, locale);
   if (error) return { error };
 
   refresh(appointmentId);
@@ -54,7 +56,7 @@ export async function saveNote(appointmentId: string, _prev: SaveState, formData
     red_flags: lines(formData.get("red_flags")),
     questions_for_doctor: lines(formData.get("questions_for_doctor")),
   });
-  if (!parsed.success || !parsed.data.chief_complaint) return { error: "The chief complaint can't be empty." };
+  if (!parsed.success || !parsed.data.chief_complaint) return { error: (await getT()).t.doctor.errEmptyComplaint };
 
   const supabase = await createClient();
   // RLS + column grants: the doctor can change only content/edited_at of their own visit's note.
@@ -62,7 +64,7 @@ export async function saveNote(appointmentId: string, _prev: SaveState, formData
     .from("notes")
     .update({ content: parsed.data, edited_at: new Date().toISOString() }, { count: "exact" })
     .eq("appointment_id", appointmentId);
-  if (error || !count) return { error: "Could not save the note." };
+  if (error || !count) return { error: (await getT()).t.doctor.errSaveNote };
 
   refresh(appointmentId);
   return { ok: true };
@@ -76,7 +78,7 @@ export async function saveDoctorNotes(appointmentId: string, _prev: SaveState, f
   const { error } = await supabase
     .from("doctor_notes")
     .upsert({ appointment_id: appointmentId, body, updated_at: new Date().toISOString() });
-  if (error) return { error: "Could not save your notes." };
+  if (error) return { error: (await getT()).t.doctor.errSaveNotes };
 
   revalidatePath(`/doctor/appointment/${appointmentId}`);
   return { ok: true, savedAt: Date.now() };
@@ -103,7 +105,7 @@ export async function saveSummary(appointmentId: string, _prev: SaveState, formD
         .from("visit_summaries")
         .upsert({ appointment_id: appointmentId, body, updated_at: new Date().toISOString() })
     : await supabase.from("visit_summaries").delete().eq("appointment_id", appointmentId);
-  if (error) return { error: "Could not save the summary." };
+  if (error) return { error: (await getT()).t.doctor.errSaveSummary };
 
   revalidatePath(`/doctor/appointment/${appointmentId}`);
   revalidatePath("/patient");

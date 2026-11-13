@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { Empty } from "@/components/page-shell";
 import { formatDay, formatTime } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
 
 /**
  * Day chips + time grid shared by booking and rescheduling. Pure links (no client JS):
  * the chosen day/slot live in the URL. `hrefFor` builds the link for a day or a slot.
  */
-export function SlotPicker({
+export async function SlotPicker({
   days,
   slotsByDay,
   day,
@@ -26,12 +27,13 @@ export function SlotPicker({
   timeStep: string;
 }) {
   const slots = (day && slotsByDay.get(day)) || [];
+  const { locale, t } = await getT();
   return (
     <>
       <section>
         <h2 className="mb-3 text-sm font-semibold tracking-wide text-brand-dark uppercase">{dayStep}</h2>
         {days.length === 0 ? (
-          <Empty>{doctorName} has no working days in the next two weeks.</Empty>
+          <Empty>{t.common.noWorkingDays(doctorName)}</Empty>
         ) : (
           <div className="flex flex-wrap gap-2">
             {days.map((d) => {
@@ -41,9 +43,9 @@ export function SlotPicker({
                   <span
                     key={d}
                     className="rounded-full border border-dashed border-line px-4 py-2 text-sm text-muted/70"
-                    title="No free times"
+                    title={t.common.noFreeTimes}
                   >
-                    {formatDay(d)} · full
+                    {formatDay(d, locale)} · {t.common.full}
                   </span>
                 );
               }
@@ -56,7 +58,7 @@ export function SlotPicker({
                     d === day ? "border-ink bg-ink text-white" : "border-line bg-white text-ink hover:border-brand"
                   }`}
                 >
-                  {formatDay(d)}
+                  {formatDay(d, locale)}
                   <span className={d === day ? "ml-1.5 text-white/70" : "ml-1.5 text-muted"}>{free}</span>
                 </Link>
               );
@@ -68,10 +70,10 @@ export function SlotPicker({
       {day && (
         <section>
           <h2 className="mb-3 text-sm font-semibold tracking-wide text-brand-dark uppercase">
-            {timeStep} <span className="font-normal normal-case text-muted">({formatDay(day)}, clinic time)</span>
+            {timeStep} <span className="font-normal normal-case text-muted">({formatDay(day, locale)}, {t.common.clinicTime})</span>
           </h2>
           {slots.length === 0 ? (
-            <Empty>No free times on this day. Try another day.</Empty>
+            <Empty>{t.common.noTimesThisDay}</Empty>
           ) : (
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 lg:grid-cols-8">
               {slots.map((s) => (
@@ -83,7 +85,7 @@ export function SlotPicker({
                     s === slot ? "border-brand bg-brand text-white" : "border-line bg-white text-ink hover:border-brand"
                   }`}
                 >
-                  {formatTime(s)}
+                  {formatTime(s, locale)}
                 </Link>
               ))}
             </div>

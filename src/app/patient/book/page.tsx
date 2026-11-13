@@ -6,14 +6,16 @@ import { formatDateTime } from "@/lib/format";
 import { SlotPicker } from "@/components/slot-picker";
 import { loadFreeDays } from "@/lib/slots";
 import { Card, Empty, PageShell } from "@/components/page-shell";
+import { getT } from "@/lib/i18n/server";
 import { ConfirmForm } from "./confirm-form";
 
-export const metadata: Metadata = { title: "Book a visit — PreVisit" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return { title: t.patient.bookTitle };
+}
 
 type Doctor = { id: string; full_name: string; specialty: string | null };
 type Hours = { doctor_id: string; weekday: number; start_time: string; end_time: string };
-
-const WEEKDAY = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function href(params: Record<string, string | undefined>) {
   const q = new URLSearchParams(Object.entries(params).filter((e): e is [string, string] => Boolean(e[1])));
@@ -42,19 +44,21 @@ export default async function BookPage({ searchParams }: PageProps<"/patient/boo
   const day = days.includes(pick("day") ?? "") ? pick("day")! : firstOpen;
   const slots = (day && slotsByDay.get(day)) || [];
   const slot = slots.includes(pick("slot") ?? "") ? pick("slot") : undefined;
+  const { locale, t } = await getT();
+  const p = t.patient;
 
   return (
-    <PageShell profile={profile} title="Book a visit" subtitle="Choose a doctor, a day and a free time.">
+    <PageShell profile={profile} title={p.bookHeading} subtitle={p.bookSubtitle}>
       <Link href="/patient" className="mb-6 inline-block text-sm text-muted hover:text-brand">
-        ← Back to my visits
+        {p.back}
       </Link>
 
       <div className="grid gap-8">
         {/* 1. Doctor */}
         <section>
-          <h2 className="mb-3 text-sm font-semibold tracking-wide text-brand-dark uppercase">1 · Doctor</h2>
+          <h2 className="mb-3 text-sm font-semibold tracking-wide text-brand-dark uppercase">{p.stepDoctor}</h2>
           {doctors.length === 0 ? (
-            <Empty>No doctors are available at your clinic yet.</Empty>
+            <Empty>{p.noDoctors}</Empty>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
               {doctors.map((d) => {
@@ -70,9 +74,9 @@ export default async function BookPage({ searchParams }: PageProps<"/patient/boo
                     }`}
                   >
                     <p className="font-semibold text-ink">{d.full_name}</p>
-                    <p className="text-sm text-muted">{d.specialty ?? "General practice"}</p>
+                    <p className="text-sm text-muted">{d.specialty ?? p.generalPractice}</p>
                     <p className="mt-2 text-xs text-muted">
-                      {days.length ? days.map((w) => WEEKDAY[w]).join(" · ") : "No working hours set"}
+                      {days.length ? days.map((w) => p.weekdays[w]).join(" · ") : p.noHours}
                     </p>
                   </Link>
                 );
@@ -90,8 +94,8 @@ export default async function BookPage({ searchParams }: PageProps<"/patient/boo
             slot={slot}
             hrefFor={(d, sl) => href({ doctor: doctor.id, day: d, slot: sl })}
             doctorName={doctor.full_name}
-            dayStep="2 · Day"
-            timeStep="3 · Time"
+            dayStep={p.stepDay}
+            timeStep={p.stepTime}
           />
         )}
 
@@ -99,9 +103,9 @@ export default async function BookPage({ searchParams }: PageProps<"/patient/boo
         {doctor && slot && (
           <section className="max-w-xl">
             <Card>
-              <h2 className="text-lg font-bold text-ink">Confirm your visit</h2>
+              <h2 className="text-lg font-bold text-ink">{p.confirmVisit}</h2>
               <p className="mt-1 mb-5 text-muted">
-                {doctor.full_name} · {formatDateTime(slot)}
+                {doctor.full_name} · {formatDateTime(slot, locale)}
               </p>
               <ConfirmForm doctorId={doctor.id} slot={slot} />
             </Card>

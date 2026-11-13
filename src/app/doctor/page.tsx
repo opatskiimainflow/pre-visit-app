@@ -6,8 +6,12 @@ import Link from "next/link";
 import { Empty, PageShell } from "@/components/page-shell";
 import { StatusChip } from "@/components/status-chip";
 import { DoctorTabs } from "./doctor-tabs";
+import { getT } from "@/lib/i18n/server";
 
-export const metadata: Metadata = { title: "Today — PreVisit" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return { title: t.doctor.upcomingTitle };
+}
 
 type Row = {
   id: string;
@@ -35,12 +39,13 @@ export default async function DoctorPage() {
 
   const rows = (data ?? []) as unknown as Row[];
   const now = nowDate();
+  const { locale, t } = await getT();
 
   return (
-    <PageShell profile={profile} title="Upcoming appointments" subtitle={profile.full_name}>
+    <PageShell profile={profile} title={t.doctor.upcomingHeading} subtitle={profile.full_name}>
       <DoctorTabs active="/doctor" />
       {rows.length === 0 ? (
-        <Empty>No appointments yet.</Empty>
+        <Empty>{t.doctor.noAppointments}</Empty>
       ) : (
         <div className="grid gap-3">
           {rows.map((a) => (
@@ -52,14 +57,14 @@ export default async function DoctorPage() {
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <span className="min-w-20 rounded-xl bg-soft px-3 py-1.5 text-center">
-                    <span className="block font-semibold text-ink">{formatTime(a.scheduled_at)}</span>
-                    <span className="block text-xs text-muted">{formatDayLabel(a.scheduled_at, now)}</span>
+                    <span className="block font-semibold text-ink">{formatTime(a.scheduled_at, locale)}</span>
+                    <span className="block text-xs text-muted">{formatDayLabel(a.scheduled_at, now, locale)}</span>
                   </span>
                   <div>
                     <p className="font-semibold text-ink">
-                      {a.patient?.full_name ?? "Patient"}
-                      {patientSummary(a.patient, now) && (
-                        <span className="ml-2 text-sm font-normal text-muted">{patientSummary(a.patient, now)}</span>
+                      {a.patient?.full_name ?? t.common.patient}
+                      {patientSummary(a.patient, now, locale) && (
+                        <span className="ml-2 text-sm font-normal text-muted">{patientSummary(a.patient, now, locale)}</span>
                       )}
                     </p>
                     {a.reason && <p className="text-sm text-muted">{a.reason}</p>}

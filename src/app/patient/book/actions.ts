@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { getT } from "@/lib/i18n/server";
+import { dbMessage } from "@/lib/i18n/messages/db";
 
 export type BookState = { error?: string };
 
@@ -15,7 +17,8 @@ export async function bookVisit(doctorId: string, slot: string, _prev: BookState
   // book_slot() re-checks everything in the database: role, clinic, schedule, availability, limits.
   const { error } = await supabase.rpc("book_slot", { p_doctor: doctorId, p_at: slot, p_reason: reason });
   if (error) {
-    return { error: error.code === "P0001" ? error.message : "Could not book this time. Please try another one." };
+    const { locale, t } = await getT();
+    return { error: error.code === "P0001" ? dbMessage(error.message, locale) : t.patient.errBook };
   }
 
   revalidatePath("/patient");

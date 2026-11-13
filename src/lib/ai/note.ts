@@ -4,6 +4,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { DEMO_MODEL, generateDemoNote } from "./demo-note";
 import { describePatient, type PatientContext } from "./patient";
+import type { Locale } from "@/lib/i18n/config";
 
 export type { PatientContext };
 
@@ -27,7 +28,7 @@ const INSTRUCTIONS = `You prepare a pre-visit note for a doctor from a patient's
 Rules:
 - Use only what the patient reported. Never invent symptoms, doses or history.
 - Do not diagnose and do not suggest treatment. You organize information; the doctor decides.
-- Be concise and clinical. Write in English even if answers are in another language.
+- Be concise and clinical. Write the note in the language named in the request, whatever language the answers are in.
 - red_flags: list only reported symptoms that may need prompt attention (e.g. chest pain, fainting,
   shortness of breath, frequent painkiller use, drug–allergy conflicts). If none, return an empty list.
 - If an answer is missing or unclear, mention it in questions_for_doctor instead of guessing.
@@ -47,10 +48,11 @@ export async function generateNote(
   answers: Answer[],
   reason: string | null,
   patient: PatientContext | null = null,
+  locale: Locale = "en",
 ): Promise<{ note: Note; model: string }> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   // No key → demo mode: a rule-based note, so the whole demo works for free.
-  if (!apiKey) return { note: generateDemoNote(answers, reason, patient), model: DEMO_MODEL };
+  if (!apiKey) return { note: generateDemoNote(answers, reason, patient, locale), model: DEMO_MODEL };
   const model = process.env.ANTHROPIC_MODEL || "claude-haiku-5-5";
 
   const client = new Anthropic({ apiKey });
@@ -61,7 +63,7 @@ export async function generateNote(
     max_tokens: 1500,
     system: INSTRUCTIONS,
     messages: [
-      { role: "user", content: `Patient: ${describePatient(patient) ?? "age and sex not given"}\nReason for booking: ${reason ?? "not given"}\n\nQuestionnaire:\n${questionnaire}` },
+      { role: "user", content: `Language of the note: ${locale === "uk" ? "Ukrainian" : "English"}\nPatient: ${describePatient(patient) ?? "age and sex not given"}\nReason for booking: ${reason ?? "not given"}\n\nQuestionnaire:\n${questionnaire}` },
     ],
     output_config: { format: zodOutputFormat(NoteSchema) },
   });

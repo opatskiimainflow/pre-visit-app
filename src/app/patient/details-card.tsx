@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { SubmitButton } from "@/components/buttons";
 import { buttonClass } from "@/components/button-styles";
+import { useT } from "@/lib/i18n/client";
 import { saveMyDetails, type DetailsState } from "./actions";
 
 const field = "rounded-xl border border-line bg-white px-3 py-2 text-ink outline-none focus:border-brand";
@@ -25,6 +26,8 @@ export function DetailsCard({
   today: string;
 }) {
   const missing = !dob || !sex;
+  const { t } = useT();
+  const p = t.patient;
   const [editing, setEditing] = useState(false);
   const [state, action] = useActionState<DetailsState, FormData>(async (prev, formData) => {
     const result = await saveMyDetails(prev, formData);
@@ -35,14 +38,14 @@ export function DetailsCard({
   if (editing) {
     return (
       <form action={action} className="grid gap-4 rounded-2xl border border-line bg-white p-5">
-        <h2 className="font-bold text-ink">My details</h2>
+        <h2 className="font-bold text-ink">{p.myDetails}</h2>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="grid gap-1.5 text-sm text-muted">
-            Date of birth
+            {p.dob}
             <input type="date" name="date_of_birth" min="1900-01-01" max={today} defaultValue={dob ?? ""} className={field} />
           </label>
           <fieldset className="grid gap-1.5 text-sm text-muted">
-            <legend className="mb-1.5">Sex</legend>
+            <legend className="mb-1.5">{p.sex}</legend>
             <div className="flex gap-2">
               {(["female", "male"] as const).map((v) => (
                 <label
@@ -50,7 +53,7 @@ export function DetailsCard({
                   className="flex cursor-pointer items-center gap-2 rounded-xl border border-line bg-white px-4 py-2 text-ink has-checked:border-brand has-checked:bg-soft"
                 >
                   <input type="radio" name="sex" value={v} defaultChecked={sex === v} className="accent-brand" />
-                  {v === "female" ? "Female" : "Male"}
+                  {t.common.sex[v]}
                 </label>
               ))}
             </div>
@@ -58,11 +61,11 @@ export function DetailsCard({
         </div>
         {state.error && <p className="text-sm text-red-600">{state.error}</p>}
         <div className="flex gap-2">
-          <SubmitButton size="sm" pendingText="Saving…">
-            Save
+          <SubmitButton size="sm" pendingText={t.common.saving}>
+            {t.common.save}
           </SubmitButton>
           <button type="button" onClick={() => setEditing(false)} className={buttonClass("ghost", "sm")}>
-            Cancel
+            {t.common.cancel}
           </button>
         </div>
       </form>
@@ -76,18 +79,18 @@ export function DetailsCard({
       }`}
     >
       <div>
-        <p className="text-sm text-muted">My details</p>
+        <p className="text-sm text-muted">{p.myDetails}</p>
         {missing ? (
-          <p className="font-semibold text-ink">Add your date of birth and sex so your doctor can prepare.</p>
+          <p className="font-semibold text-ink">{p.addDetailsPrompt}</p>
         ) : (
           <p className="font-semibold text-ink">
             {birthDate} <span className="font-normal text-muted">· {summary}</span>
           </p>
         )}
-        {state.ok && <p className="mt-1 text-sm text-brand-dark">Saved. Your doctor will see this before the visit.</p>}
+        {state.ok && <p className="mt-1 text-sm text-brand-dark">{p.detailsSaved}</p>}
       </div>
       <button type="button" onClick={() => setEditing(true)} className={buttonClass(missing ? "brand" : "ghost", "sm")}>
-        {missing ? "Add details" : "Edit"}
+        {missing ? p.addDetails : t.common.edit}
       </button>
     </div>
   );

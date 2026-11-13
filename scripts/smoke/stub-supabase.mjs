@@ -57,10 +57,10 @@ function rows(table) {
       return [{ id: CLINIC, name: "Sunrise Family Clinic" }];
     case "questions":
       return [
-        { id: id(500), position: 1, text: "What is the main reason for your visit?", kind: "long", required: true, parent_id: null, prefill: null },
-        { id: id(501), position: 2, text: "Chest pain?", kind: "yes_no", required: true, parent_id: null, prefill: null },
-        { id: id(503), position: 4, text: "What happened?", kind: "long", required: true, parent_id: id(501), prefill: null },
-        { id: id(502), position: 3, text: "Allergies?", kind: "short", required: false, parent_id: null, prefill: "allergies" },
+        { id: id(500), position: 1, text: "What is the main reason for your visit?", text_uk: "Яка основна причина вашого візиту?", kind: "long", required: true, parent_id: null, prefill: null },
+        { id: id(501), position: 2, text: "Chest pain?", text_uk: "Біль у грудях?", kind: "yes_no", required: true, parent_id: null, prefill: null },
+        { id: id(503), position: 4, text: "What happened?", text_uk: null, kind: "long", required: true, parent_id: id(501), prefill: null },
+        { id: id(502), position: 3, text: "Allergies?", text_uk: "Алергії?", kind: "short", required: false, parent_id: null, prefill: "allergies" },
       ];
     case "medical_cards":
       return [{ patient_id: USERS.patient.id, allergies: "None", medications: "Salbutamol inhaler", conditions: "Mild asthma", updated_at: inDays(-2, 9) }];

@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { isCardField, visibleQuestions, type MedicalCard, type Question } from "@/lib/medical-card";
+import { isCardField, questionText, visibleQuestions, type MedicalCard, type Question } from "@/lib/medical-card";
+import { useT } from "@/lib/i18n/client";
 import { submitIntake, type IntakeState } from "./actions";
 
 export function QuestionnaireForm({
@@ -13,6 +14,8 @@ export function QuestionnaireForm({
   questions: Question[];
   card: MedicalCard | null;
 }) {
+  const { locale, t } = useT();
+  const p = t.patient;
   const [state, action, pending] = useActionState<IntakeState, FormData>(
     submitIntake.bind(null, appointmentId),
     {},
@@ -28,7 +31,7 @@ export function QuestionnaireForm({
     <form action={action} className="grid gap-5">
       {card && hasPrefill && (
         <p className="rounded-2xl border border-brand/30 bg-white p-4 text-sm text-ink">
-          Some answers are already filled in from your medical card. Check that they are still correct.
+          {p.prefilledBanner}
         </p>
       )}
 
@@ -48,16 +51,16 @@ export function QuestionnaireForm({
               followUp ? "-mt-3 ml-4 animate-[fade-in_200ms_ease-out] border-brand/40 sm:ml-8" : "border-line"
             }`}
           >
-            <legend className="sr-only">{followUp ? "Follow-up question" : `Question ${number}`}</legend>
+            <legend className="sr-only">{followUp ? p.followUpQuestion : p.question(number)}</legend>
             <label htmlFor={q.id} className="mb-3 block font-medium text-ink">
               <span className="mr-2 text-brand-dark">{followUp ? "↳" : `${number}.`}</span>
-              {q.text}
+              {questionText(q, locale)}
               {q.required && <span className="ml-1 text-red-500">*</span>}
             </label>
 
             {q.kind === "yes_no" ? (
               <div className="flex gap-3">
-                {["Yes", "No"].map((v) => (
+                {(["Yes", "No"] as const).map((v) => (
                   <label
                     key={v}
                     className="flex cursor-pointer items-center gap-2 rounded-full border border-line px-5 py-2 has-checked:border-brand has-checked:bg-soft"
@@ -70,7 +73,7 @@ export function QuestionnaireForm({
                       onChange={() => setYesNo((s) => ({ ...s, [q.id]: v }))}
                       className="accent-brand"
                     />
-                    {v}
+                    {v === "Yes" ? p.yes : p.no}
                   </label>
                 ))}
               </div>
@@ -79,8 +82,8 @@ export function QuestionnaireForm({
             ) : (
               <input id={q.id} name={q.id} maxLength={500} defaultValue={initial} className={`w-full ${field}`} />
             )}
-            {prefilled && initial === prefilled && <p className="mt-2 text-xs text-brand-dark">From your medical card</p>}
-            {invalid && <p className="mt-2 text-sm text-red-600">This question is required.</p>}
+            {prefilled && initial === prefilled && <p className="mt-2 text-xs text-brand-dark">{p.fromCard}</p>}
+            {invalid && <p className="mt-2 text-sm text-red-600">{p.required}</p>}
           </fieldset>
         );
       })}
@@ -88,7 +91,7 @@ export function QuestionnaireForm({
       {hasPrefill && (
         <label className="flex items-center gap-2 text-sm text-ink">
           <input type="checkbox" name="save_card" defaultChecked className="size-4 accent-brand" />
-          Save my allergies, medications and conditions to my medical card for next time
+          {p.saveToCard}
         </label>
       )}
 
@@ -98,10 +101,10 @@ export function QuestionnaireForm({
         disabled={pending}
         className="justify-self-start rounded-full bg-ink px-7 py-3.5 font-semibold text-white hover:bg-brand disabled:opacity-60"
       >
-        {pending ? "Sending and preparing your note…" : "Send to my doctor"}
+        {pending ? p.sendingAnswers : p.sendToDoctor}
       </button>
       <p className="text-xs text-muted">
-        Your answers go only to your clinic. An AI organizes them into a note for your doctor; it does not diagnose.
+        {p.privacy}
       </p>
     </form>
   );

@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { isDemoEmail } from "@/lib/demo";
+import { getT } from "@/lib/i18n/server";
 
 export type ForgotState = { error?: string; sent?: boolean; email?: string };
 
@@ -10,9 +11,10 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function requestReset(_prev: ForgotState, formData: FormData): Promise<ForgotState> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  if (!EMAIL.test(email)) return { email, error: "Enter a valid email address." };
+  const { t } = await getT();
+  if (!EMAIL.test(email)) return { email, error: t.auth.errEmail };
   if (isDemoEmail(email)) {
-    return { email, error: "Demo accounts share one password and can't be reset. Use the demo buttons instead." };
+    return { email, error: t.auth.errDemoReset };
   }
 
   const h = await headers();
@@ -24,7 +26,7 @@ export async function requestReset(_prev: ForgotState, formData: FormData): Prom
     redirectTo: `${origin}/auth/callback?next=/reset-password`,
   });
   if (error?.code === "over_email_send_rate_limit" || error?.status === 429) {
-    return { email, error: "Too many emails were sent recently. Please try again in an hour." };
+    return { email, error: t.auth.errTooManyEmails };
   }
   // Same answer whether or not the account exists, so the form can't be used to probe emails.
   return { email, sent: true };

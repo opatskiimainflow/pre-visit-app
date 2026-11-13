@@ -28,16 +28,14 @@ const PAGES = {
 };
 
 let failed = 0;
-for (const [role, paths] of Object.entries(PAGES)) {
+for (const lang of ["en", "uk"]) for (const [role, paths] of Object.entries(PAGES)) {
   for (const path of paths) {
-    const res = await fetch(BASE + path, {
-      headers: role === "anon" ? {} : { cookie: cookieFor(role) },
-      redirect: "manual",
-    });
+    const cookie = [`lang=${lang}`, role === "anon" ? null : cookieFor(role)].filter(Boolean).join("; ");
+    const res = await fetch(BASE + path, { headers: { cookie }, redirect: "manual" });
     const body = res.status === 200 ? await res.text() : "";
     const broken = res.status >= 500 || /This page couldn.t load|Application error|digest/.test(body);
     if (broken) failed++;
-    console.log(`${broken ? "FAIL" : "ok  "} ${res.status} ${role.padEnd(7)} ${path}${res.headers.get("location") ? " -> " + res.headers.get("location") : ""}`);
+    console.log(`${broken ? "FAIL" : "ok  "} ${res.status} ${lang} ${role.padEnd(7)} ${path}${res.headers.get("location") ? " -> " + res.headers.get("location") : ""}`);
   }
 }
 if (failed) {

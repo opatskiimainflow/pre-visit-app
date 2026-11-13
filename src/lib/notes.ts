@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { generateNote, type Answer, type PatientContext } from "@/lib/ai/note";
 import { ageFrom, nowDate } from "@/lib/format";
+import type { Locale } from "@/lib/i18n/config";
 
 /**
  * Generates the AI note for an appointment that already has answers and saves it.
@@ -13,6 +14,7 @@ export async function createNoteForAppointment(
   appointmentId: string,
   answers: Answer[],
   reason: string | null,
+  locale: Locale = "en",
 ): Promise<string | null> {
   try {
     const { data: appt } = await supabase
@@ -28,17 +30,23 @@ export async function createNoteForAppointment(
         }
       : null;
 
-    const { note, model } = await generateNote(answers, reason, patient);
+    const { note, model } = await generateNote(answers, reason, patient, locale);
     const { error } = await supabase
       .from("notes")
       .insert({ appointment_id: appointmentId, content: note, model });
     if (error) {
       // 23505 = unique violation: a note already exists, which is fine.
-      return error.code === "23505" ? null : `Could not save the note: ${error.message}`;
+      return error.code === "23505"
+        ? null
+        : locale === "uk"
+          ? `Не вдалося зберегти нотатку: ${error.message}`
+          : `Could not save the note: ${error.message}`;
     }
     return null;
   } catch (e) {
     console.error("AI note generation failed", e);
-    return "The AI note could not be generated. Please try again.";
+    return locale === "uk"
+      ? "Не вдалося згенерувати AI-нотатку. Спробуйте ще раз."
+      : "The AI note could not be generated. Please try again.";
   }
 }

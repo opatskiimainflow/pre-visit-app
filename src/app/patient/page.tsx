@@ -12,8 +12,12 @@ import { MedicalCardPanel } from "./medical-card";
 import { RateForm } from "./rate-form";
 import { Stars } from "@/components/stars";
 import type { MedicalCard } from "@/lib/medical-card";
+import { getT } from "@/lib/i18n/server";
 
-export const metadata: Metadata = { title: "My visits — PreVisit" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return { title: t.patient.homeTitle };
+}
 
 type Row = {
   id: string;
@@ -70,16 +74,19 @@ export default async function PatientPage({ searchParams }: PageProps<"/patient"
   const medical = card as (MedicalCard & { updated_at: string }) | null;
   const nowD = nowDate();
   const now = nowD.getTime();
+  const { locale, t } = await getT();
+  const p = t.patient;
+  const firstName = profile.full_name.split(" ")[0];
 
   return (
     <PageShell
       profile={profile}
-      title={`Hi, ${profile.full_name.split(" ")[0]}`}
-      subtitle="Book a visit and answer a few questions before it, so your doctor is ready."
+      title={p.hi(firstName)}
+      subtitle={p.homeSubtitle}
     >
       <div className="mb-6">
         <Link href="/patient/book" className={buttonClass("brand")}>
-          + Book a visit
+          {p.bookVisitButton}
         </Link>
       </div>
 
@@ -87,8 +94,8 @@ export default async function PatientPage({ searchParams }: PageProps<"/patient"
         <DetailsCard
           dob={me?.date_of_birth ?? null}
           sex={me?.sex ?? null}
-          summary={patientSummary(me, nowD)}
-          birthDate={me?.date_of_birth ? formatBirthDate(me.date_of_birth) : null}
+          summary={patientSummary(me, nowD, locale)}
+          birthDate={me?.date_of_birth ? formatBirthDate(me.date_of_birth, locale) : null}
           today={kyivToday(nowD)}
         />
       </div>
@@ -96,24 +103,21 @@ export default async function PatientPage({ searchParams }: PageProps<"/patient"
       <div className="mb-6">
         <MedicalCardPanel
           card={medical}
-          updated={medical?.updated_at ? formatBirthDate(kyivToday(new Date(medical.updated_at))) : null}
+          updated={medical?.updated_at ? formatBirthDate(kyivToday(new Date(medical.updated_at)), locale) : null}
         />
       </div>
 
       {welcome && (
         <div className="mb-6 rounded-2xl border border-brand/30 bg-white p-5 text-ink">
-          <p className="font-semibold">Welcome to PreVisit, {profile.full_name.split(" ")[0]}!</p>
-          <p className="text-sm text-muted">
-            Your demo account is ready. Add your details below, then book a visit. Demo accounts are deleted every
-            night.
-          </p>
+          <p className="font-semibold">{p.welcome(firstName)}</p>
+          <p className="text-sm text-muted">{p.welcomeText}</p>
         </div>
       )}
 
       {moved && (
         <div className="mb-6 rounded-2xl border border-brand/30 bg-white p-5 text-ink">
-          <p className="font-semibold">Your visit was moved.</p>
-          <p className="text-sm text-muted">Anything you already answered in the questionnaire stays with the visit.</p>
+          <p className="font-semibold">{p.movedTitle}</p>
+          <p className="text-sm text-muted">{p.movedText}</p>
         </div>
       )}
 
@@ -121,21 +125,21 @@ export default async function PatientPage({ searchParams }: PageProps<"/patient"
         <div className="mb-6 rounded-2xl border border-brand/30 bg-white p-5 text-ink">
           {booked ? (
             <>
-              <p className="font-semibold">Your visit is booked.</p>
-              <p className="text-sm text-muted">Fill in the questionnaire below so your doctor can prepare.</p>
+              <p className="font-semibold">{p.bookedTitle}</p>
+              <p className="text-sm text-muted">{p.bookedText}</p>
             </>
           ) : (
             <>
-              <p className="font-semibold">Thank you — your answers were sent.</p>
-              <p className="text-sm text-muted">Your doctor will read them before the visit.</p>
+              <p className="font-semibold">{p.sentTitle}</p>
+              <p className="text-sm text-muted">{p.sentText}</p>
             </>
           )}
         </div>
       )}
 
-      <h2 className="mb-4 text-xl font-bold text-ink">Upcoming visits</h2>
+      <h2 className="mb-4 text-xl font-bold text-ink">{p.upcoming}</h2>
       {visits.length === 0 ? (
-        <Empty>You have no upcoming visits.</Empty>
+        <Empty>{p.noUpcoming}</Empty>
       ) : (
         <div className="grid gap-4">
           {visits.map((v) => {
@@ -144,36 +148,36 @@ export default async function PatientPage({ searchParams }: PageProps<"/patient"
               <Card key={v.id}>
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
-                    <p className="font-semibold text-ink">{formatDateTime(v.scheduled_at)}</p>
+                    <p className="font-semibold text-ink">{formatDateTime(v.scheduled_at, locale)}</p>
                     <p className="text-sm text-muted">
-                      {v.doctor?.full_name ?? "Doctor"}
+                      {v.doctor?.full_name ?? t.common.doctor}
                       {v.doctor?.specialty ? ` · ${v.doctor.specialty}` : ""}
                       {v.reason ? ` · ${v.reason}` : ""}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
                     {v.status === "completed" ? (
-                      <span className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-white">Visit completed</span>
+                      <span className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-white">{p.visitCompleted}</span>
                     ) : v.intake ? (
                       <span className="rounded-full bg-soft px-4 py-2 text-sm font-medium text-brand-dark">
-                        Questionnaire sent ✓
+                        {p.questionnaireSent}
                       </span>
                     ) : (
                       <Link
                         href={`/patient/visit/${v.id}`}
                         className="rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand"
                       >
-                        Fill in questionnaire →
+                        {p.fillQuestionnaire}
                       </Link>
                     )}
                     {canCancel && (
                       <Link href={`/patient/reschedule/${v.id}`} className={buttonClass("ghost", "sm")}>
-                        Reschedule
+                        {p.reschedule}
                       </Link>
                     )}
                     {canCancel && (
                       <form action={cancelMyVisit.bind(null, v.id)}>
-                        <ConfirmSubmit confirmText="Cancel visit">Cancel</ConfirmSubmit>
+                        <ConfirmSubmit confirmText={p.cancelVisit}>{p.cancel}</ConfirmSubmit>
                       </form>
                     )}
                   </div>
@@ -186,32 +190,32 @@ export default async function PatientPage({ searchParams }: PageProps<"/patient"
 
       {past.length > 0 && (
         <section className="mt-10">
-          <h2 className="mb-4 text-xl font-bold text-ink">Past visits</h2>
+          <h2 className="mb-4 text-xl font-bold text-ink">{p.past}</h2>
           <div className="grid gap-4">
             {past.map((v) => (
               <Card key={v.id}>
                 <div className="grid gap-4 md:grid-cols-[1fr_280px]">
                   <div className="min-w-0">
-                    <p className="font-semibold text-ink">{formatDateTime(v.scheduled_at)}</p>
+                    <p className="font-semibold text-ink">{formatDateTime(v.scheduled_at, locale)}</p>
                     <p className="text-sm text-muted">
-                      {v.doctor?.full_name ?? "Doctor"}
+                      {v.doctor?.full_name ?? t.common.doctor}
                       {v.reason ? ` · ${v.reason}` : ""}
                     </p>
                     {v.summary ? (
                       <div className="mt-3 rounded-xl bg-soft p-4">
                         <p className="text-xs font-semibold tracking-wide text-brand-dark uppercase">
-                          Doctor&apos;s recommendations
+                          {p.recommendations}
                         </p>
                         <p className="mt-1 text-sm whitespace-pre-line text-ink">{v.summary.body}</p>
                       </div>
                     ) : (
-                      <p className="mt-3 text-sm text-muted">No written summary for this visit.</p>
+                      <p className="mt-3 text-sm text-muted">{p.noSummary}</p>
                     )}
                   </div>
                   <div className="md:border-l md:border-line md:pl-5">
                     {v.rating ? (
                       <div>
-                        <p className="text-sm text-muted">Your rating</p>
+                        <p className="text-sm text-muted">{p.yourRating}</p>
                         <Stars value={v.rating.stars} />
                         {v.rating.comment && <p className="mt-1 text-sm text-ink">“{v.rating.comment}”</p>}
                       </div>

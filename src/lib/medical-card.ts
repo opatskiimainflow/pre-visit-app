@@ -1,33 +1,31 @@
 /** The patient's medical card: kept between visits, pre-fills the questionnaire. */
 export type MedicalCard = { allergies: string; medications: string; conditions: string; updated_at?: string };
 
-export const CARD_FIELDS = [
-  { key: "allergies", label: "Allergies", placeholder: "e.g. Penicillin (rash), peanuts — or “None”" },
-  { key: "medications", label: "Medications", placeholder: "e.g. Lisinopril 10 mg every morning" },
-  { key: "conditions", label: "Chronic conditions", placeholder: "e.g. Asthma, high blood pressure — or “None”" },
-] as const;
+/** Labels and placeholders are in the i18n messages (patient.cardFields). */
+export const CARD_FIELDS = [{ key: "allergies" }, { key: "medications" }, { key: "conditions" }] as const;
 
 export type CardField = (typeof CARD_FIELDS)[number]["key"];
 
 export const isCardField = (v: unknown): v is CardField =>
   v === "allergies" || v === "medications" || v === "conditions";
 
-export const CARD_LABEL: Record<CardField, string> = {
-  allergies: "Allergies",
-  medications: "Medications",
-  conditions: "Chronic conditions",
-};
-
 export type Question = {
   id: string;
   text: string;
+  /** Ukrainian wording set by the clinic admin (migrations/009); falls back to `text`. */
+  text_uk: string | null;
   kind: string;
   required: boolean;
   parent_id: string | null;
   prefill: string | null;
 };
 
-export const QUESTION_SELECT = "id, text, kind, required, parent_id, prefill";
+export const QUESTION_SELECT = "id, text, text_uk, kind, required, parent_id, prefill";
+
+/** The question in the patient's UI language, as the clinic wrote it. */
+export function questionText(q: { text: string; text_uk?: string | null }, locale: "en" | "uk") {
+  return locale === "uk" && q.text_uk?.trim() ? q.text_uk : q.text;
+}
 
 /**
  * Which questions count for a set of answers: a follow-up only when its parent was answered "Yes".

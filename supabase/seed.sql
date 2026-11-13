@@ -80,21 +80,21 @@ begin
   union all select v_doc2, 6, time '10:00', time '13:00', 30;
 
   -- prefill: answered in advance from the patient's medical card (migrations/008).
-  insert into public.questions (clinic_id, position, text, kind, required, prefill) values
-    (v_clinic, 1, 'What is the main reason for your visit?', 'long', true, null),
-    (v_clinic, 2, 'When did it start, and is it getting better or worse?', 'short', true, null),
-    (v_clinic, 3, 'Which medications do you take right now (including supplements)?', 'long', true, 'medications'),
-    (v_clinic, 4, 'Do you have any allergies to medicines or food?', 'short', true, 'allergies'),
-    (v_clinic, 5, 'Do you have any chronic conditions (e.g. diabetes, asthma, hypertension)?', 'short', false, 'conditions'),
-    (v_clinic, 6, 'Have you had chest pain, shortness of breath or fainting recently?', 'yes_no', true, null),
-    (v_clinic, 8, 'Do you smoke or vape?', 'yes_no', false, null),
-    (v_clinic, 10, 'Anything else you want your doctor to know?', 'long', false, null);
+  insert into public.questions (clinic_id, position, text, text_uk, kind, required, prefill) values
+    (v_clinic, 1, 'What is the main reason for your visit?', 'Яка основна причина вашого візиту?', 'long', true, null),
+    (v_clinic, 2, 'When did it start, and is it getting better or worse?', 'Коли це почалося і чи стає краще або гірше?', 'short', true, null),
+    (v_clinic, 3, 'Which medications do you take right now (including supplements)?', 'Які ліки ви зараз приймаєте (включно з добавками)?', 'long', true, 'medications'),
+    (v_clinic, 4, 'Do you have any allergies to medicines or food?', 'Чи є у вас алергія на ліки або їжу?', 'short', true, 'allergies'),
+    (v_clinic, 5, 'Do you have any chronic conditions (e.g. diabetes, asthma, hypertension)?', 'Чи є у вас хронічні хвороби (напр. діабет, астма, гіпертонія)?', 'short', false, 'conditions'),
+    (v_clinic, 6, 'Have you had chest pain, shortness of breath or fainting recently?', 'Чи був у вас останнім часом біль у грудях, задишка або непритомність?', 'yes_no', true, null),
+    (v_clinic, 8, 'Do you smoke or vape?', 'Чи курите ви або вейпите?', 'yes_no', false, null),
+    (v_clinic, 10, 'Anything else you want your doctor to know?', 'Що ще ви хотіли б повідомити лікарю?', 'long', false, null);
   -- Follow-ups: shown only after a "Yes" to the question above them.
-  insert into public.questions (clinic_id, position, text, kind, required, parent_id)
-  select v_clinic, 7, 'What exactly happened, when, and how long did it last?', 'long', true, id
+  insert into public.questions (clinic_id, position, text, text_uk, kind, required, parent_id)
+  select v_clinic, 7, 'What exactly happened, when, and how long did it last?', 'Що саме сталося, коли і скільки це тривало?', 'long', true, id
   from public.questions where clinic_id = v_clinic and position = 6;
-  insert into public.questions (clinic_id, position, text, kind, required, parent_id)
-  select v_clinic, 9, 'How much per day, and for how many years?', 'short', true, id
+  insert into public.questions (clinic_id, position, text, text_uk, kind, required, parent_id)
+  select v_clinic, 9, 'How much per day, and for how many years?', 'Скільки на день і скільки років?', 'short', true, id
   from public.questions where clinic_id = v_clinic and position = 8;
 
   -- The demo patient's upcoming visit (questionnaire not filled yet).

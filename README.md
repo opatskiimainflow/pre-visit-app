@@ -100,3 +100,5 @@ npx next build && npx next start -p 3100 &
 node scripts/smoke/render-all.mjs http://127.0.0.1:3100
 rm .env.production.local   # don't deploy with the stub URL
 ```
+
+Links from the marketing site open the app in the same language: `/login?lang=uk` or `/login?lang=en` saves the choice through `/lang/[locale]` and returns to the sign-in page.

@@ -18,7 +18,7 @@ export type Question = {
   prefill: string | null;
 };
 
-const select = "rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-brand";
+const select = "min-w-0 max-w-full rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-brand";
 const questionLabel = (q: Question, locale: string) => (locale === "uk" && q.text_uk ? q.text_uk : q.text);
 const short = (t: string) => (t.length > 48 ? `${t.slice(0, 46)}…` : t);
 
@@ -32,12 +32,12 @@ function QuestionFields({ q, parents, hasChildren }: { q?: Question; parents: Qu
   const Q = t.admin.questions;
   const area = "w-full rounded-xl border border-line bg-white px-4 py-3 text-ink outline-none focus:border-brand";
   return (
-    <div className="grid gap-3">
-      <label className="grid gap-1.5 text-sm text-muted">
+    <div className="grid grid-cols-1 gap-3">
+      <label className="grid min-w-0 grid-cols-1 gap-1.5 text-sm text-muted">
         {Q.textEn}
         <textarea name="text" defaultValue={q?.text} required rows={2} maxLength={300} placeholder={Q.textPlaceholder} className={area} />
       </label>
-      <label className="grid gap-1.5 text-sm text-muted">
+      <label className="grid min-w-0 grid-cols-1 gap-1.5 text-sm text-muted">
         {Q.textUk}
         <textarea
           name="text_uk"
@@ -66,8 +66,8 @@ function QuestionFields({ q, parents, hasChildren }: { q?: Question; parents: Qu
           {Q.required}
         </label>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="grid gap-1.5 text-sm text-muted">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label className="grid min-w-0 grid-cols-1 gap-1.5 text-sm text-muted">
           {Q.show}
           <select name="parent_id" defaultValue={q?.parent_id ?? ""} disabled={hasChildren} className={select}>
             <option value="">{Q.always}</option>
@@ -79,7 +79,7 @@ function QuestionFields({ q, parents, hasChildren }: { q?: Question; parents: Qu
           </select>
           {hasChildren && <span className="text-xs">{Q.hasFollowUps}</span>}
         </label>
-        <label className="grid gap-1.5 text-sm text-muted">
+        <label className="grid min-w-0 grid-cols-1 gap-1.5 text-sm text-muted">
           {Q.prefill}
           <select name="prefill" defaultValue={q?.prefill ?? ""} className={select}>
             <option value="">{Q.no}</option>
@@ -123,7 +123,7 @@ function QuestionRow({
   if (editing) {
     return (
       <li className="py-4">
-        <form action={action} className="grid gap-3">
+        <form action={action} className="grid grid-cols-1 gap-3">
           <QuestionFields q={q} parents={parents} hasChildren={hasChildren} />
           {state.error && <p className="text-sm text-red-600">{state.error}</p>}
           <div className="flex gap-2">
@@ -138,7 +138,8 @@ function QuestionRow({
   }
 
   return (
-    <li className={`flex flex-wrap items-start gap-4 py-4 ${followUp ? "pl-6 sm:pl-12" : ""}`}>
+    <li className={`flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:gap-4 ${followUp ? "pl-4 sm:pl-12" : ""}`}>
+      <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
       <span
         className={`grid size-8 shrink-0 place-items-center rounded-lg text-sm font-semibold ${
           followUp ? "border border-brand/40 text-brand-dark" : "bg-soft text-brand-dark"
@@ -147,7 +148,7 @@ function QuestionRow({
         {label}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="font-medium text-ink">{questionLabel(q, locale)}</p>
+        <p className="font-medium break-words text-ink">{questionLabel(q, locale)}</p>
         {locale === "uk" ? (
           q.text_uk && <p className="text-sm text-muted" lang="en">{q.text}</p>
         ) : q.text_uk ? (
@@ -161,7 +162,8 @@ function QuestionRow({
         </p>
         {!q.text_uk && <p className="text-xs text-amber-800">{Q.noUk}</p>}
       </div>
-      <div className="flex flex-wrap items-center gap-1.5">
+      </div>
+      <div className="flex shrink-0 flex-wrap items-center gap-1.5 pl-11 sm:pl-0">
         <form action={moveQuestion.bind(null, q.id, -1)}>
           <button disabled={first} aria-label={Q.moveUp} className={buttonClass("ghost", "sm")}>
             ↑
@@ -193,7 +195,7 @@ function AddQuestion({ parents }: { parents: Question[] }) {
   }, [state]);
 
   return (
-    <form ref={formRef} action={action} className="grid gap-3">
+    <form ref={formRef} action={action} className="grid grid-cols-1 gap-3">
       <h2 className="font-bold text-ink">{Q.addHeading}</h2>
       <QuestionFields parents={parents} />
       {state.error && <p className="text-sm text-red-600">{state.error}</p>}
@@ -212,8 +214,8 @@ export function QuestionEditor({ questions }: { questions: Question[] }) {
   const Q = useT().t.admin.questions;
   let n = 0;
   return (
-    <div className="grid gap-6">
-      <div className="rounded-2xl border border-line bg-white px-6 py-2">
+    <div className="grid grid-cols-1 gap-6">
+      <div className="rounded-2xl border border-line bg-white px-4 py-2 sm:px-6">
         {questions.length === 0 ? (
           <p className="py-6 text-center text-muted">{Q.empty}</p>
         ) : (
@@ -236,7 +238,7 @@ export function QuestionEditor({ questions }: { questions: Question[] }) {
           </ol>
         )}
       </div>
-      <div className="rounded-2xl border border-line bg-white p-6">
+      <div className="rounded-2xl border border-line bg-white p-4 sm:p-6">
         <AddQuestion parents={parents} />
       </div>
       <p className="text-xs text-muted">
